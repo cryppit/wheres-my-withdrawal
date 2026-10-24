@@ -75,7 +75,7 @@
 </main>
 <script type="module">
   import { check } from "./src/check.js";
-  import { formatAmount, utc, whoIs, claimedWhen } from "./src/render.js";
+  import { formatAmount, utc, whoIs, claimLine } from "./src/render.js";
 
   const $ = (id) => document.getElementById(id);
   const PILL = {
@@ -109,7 +109,8 @@
     if (v.who === "anyone") row(dl, "Who can do it", "Anyone. The money only goes to the recipient.");
     if (f.asset.to) row(dl, "Recipient", f.asset.to, true);
     if (v.proof) row(dl, "Proven", `${utc(v.proof.provenAt)} by ${whoIs(v.proof.submitter, f)}`);
-    if (v.claim) row(dl, "Claimed", `${claimedWhen(v.claim)} by ${whoIs(v.claim.by, f)}`);
+    const claimed = claimLine(v, f);
+    if (claimed) row(dl, "Claimed", claimed);
     if (v.action) row(dl, "The call", v.action, true);
     if (v.action && f.proof) row(dl, "Proof", `${f.proof.hashes.length} hashes to root ${f.proof.root}${f.proof.rootConfirmed ? ", which the Outbox has confirmed" : ""}: ${f.proof.hashes.join(" ")}`, true);
     row(dl, "Started", `${utc(f.l2.timestamp)}, L2 block ${f.l2.blockNumber}`);
@@ -120,11 +121,19 @@
     out.append(card);
   }
 
+  // The verdict shows as soon as it is known; slow extras (who sent an Arbitrum claim) fill in when they arrive,
+  // unless the visitor has started another check by then.
+  let runs = 0;
   async function run() {
     const tx = $("tx").value.trim();
+    const me = ++runs;
     $("go").disabled = true;
     $("out").replaceChildren(el("p", "foot", "Reading Ethereum and the L2…"));
-    try { show(await check(tx, { chain: $("chain").value })); }
+    try {
+      const r = await check(tx, { chain: $("chain").value, deferExtras: true });
+      show(r);
+      r.extras?.then((full) => { if (me === runs) show(full); });
+    }
     catch (e) { show({ error: "rpc", message: `The public RPCs did not answer (${e.message}). Try again in a minute.` }); }
     finally { $("go").disabled = false; }
   }

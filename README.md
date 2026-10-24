@@ -58,9 +58,14 @@ For each Arbitrum One withdrawal it reads, at the latest finalized Ethereum bloc
    the token to the destination gateway and that gateway's L2 counterpart sent the message; anything else is shown as
    a message;
 2. `Outbox.isSpent(position)` (the Outbox is read from the rollup each time). If it is spent, the withdrawal is done,
-   and the tool looks for who sent the claim: the first L1 block where `isSpent` turned true (a four-way search on
-   historical state), then the `OutBoxTransactionExecuted` log in that block and its transaction's sender. That needs
-   an archive endpoint; when none answers, the verdict says it could not tell;
+   and the tool looks for who sent the claim. Every claim emits `OutBoxTransactionExecuted(to, l2Sender, 0,
+   transactionIndex)` with `transactionIndex` = `position`, and a position is spent only once, so the claim is the log
+   with this withdrawal's `to`, `l2Sender` and position. It lies between the withdrawal's L1 block plus one confirm
+   period and the finalized block. The first round reads the logs at both ends of that range (most claims come when
+   the window opens, or recently from third parties) while `isSpent` on historical state at 15 points narrows the
+   range 16-fold per round, until it fits one log query of 10,000 blocks. That needs an archive endpoint; when none
+   answers, or the log is not where it must be, the verdict says it could not tell and names nobody. The page shows
+   the verdict first and fills in the claimer when the search ends ("Finding who claimed it…");
 3. `latestConfirmed()` on the rollup, the `AssertionConfirmed` log that carries its L2 block hash, and that block's
    `sendCount` from the L2. If `sendCount > position`, anyone can claim: the tool fetches the Merkle proof from
    NodeInterface (`0xc8`) `constructOutboxProof(sendCount, position)` and checks that its leaf is this withdrawal's hash
@@ -77,9 +82,10 @@ state. Rival assertions are not told apart: the first one that includes the with
 
 Public JSON-RPC endpoints without keys, tried in order: the chains' own RPCs and PublicNode for OP Mainnet and Base;
 arb1.arbitrum.io, Blast's public endpoint and Nodies for Arbitrum One; PublicNode and MEV Blocker for Ethereum. The
-Arbitrum lookups that reach back days (an assertion created about 6.4 days ago, the block a claim happened in) need
-historical logs and state, which PublicNode's free tier refuses and MEV Blocker served in testing. They are rate
-limited and offered as is; for heavy use, run your own node.
+Arbitrum lookups that reach back more than about a day (an assertion created about 6.4 days ago, the block a claim
+happened in) need historical logs and state, which PublicNode's free tier refuses; they go straight to MEV Blocker,
+then Tenderly's public gateway. With "Find chain", all three L2s are asked at once and the one that has the
+transaction answers. The endpoints are rate limited and offered as is; for heavy use, run your own node.
 
 ## Licence
 
