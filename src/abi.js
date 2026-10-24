@@ -42,3 +42,13 @@ export function decodeBytes(hex, i) {
 }
 
 export const sameAddress = (a, b) => typeof a === "string" && typeof b === "string" && a.toLowerCase() === b.toLowerCase();
+
+/** An ABI-encoded `string` return value, or null if it is not one (some old tokens return bytes32). */
+export function decodeString(hex) {
+  try {
+    const raw = decodeBytes(hex, 0).slice(2);
+    return new TextDecoder().decode(Uint8Array.from(raw.match(/.{2}/g) ?? [], (b) => parseInt(b, 16)));
+  } catch {
+    return null;
+  }
+}

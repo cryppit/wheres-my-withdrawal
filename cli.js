@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Usage: node cli.js <L2 tx hash> [--chain op|base] [--index n] [--json]
+// Usage: node cli.js <L2 tx hash> [--chain op|base|arb] [--index n] [--json]
 import { check } from "./src/check.js";
 import { renderText } from "./src/render.js";
 
@@ -10,7 +10,7 @@ const flag = (name) => {
 };
 const tx = argv.find((a) => a.startsWith("0x"));
 if (!tx) {
-  console.error("Usage: node cli.js <L2 tx hash> [--chain op|base] [--index n] [--json]");
+  console.error("Usage: node cli.js <L2 tx hash> [--chain op|base|arb] [--index n] [--json]");
   process.exit(2);
 }
 const r = await check(tx, { chain: flag("chain") ?? "auto", index: Number(flag("index") ?? 0) });
