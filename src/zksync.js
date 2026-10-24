@@ -57,7 +57,12 @@ export function assetOf(w, txFrom) {
   return { kind: "message", from: txFrom, to: null };
 }
 
-export async function readFacts(chain, txHash, { l1, l2 }, { index = 0 } = {}) {
+/**
+ * `clients.l1Archive` serves old state (MEV Blocker, Tenderly); it defaults to `l1`.
+ * With `deferClaim`, a finalized withdrawal comes back with claimLookup "pending" and no history search: claimOf()
+ * fills in who sent the finalize transaction afterwards, so the page can show the verdict first.
+ */
+export async function readFacts(chain, txHash, { l1, l2, l1Archive = l1 }, { index = 0, deferClaim = false } = {}) {
   const receipt = await l2("eth_getTransactionReceipt", [txHash]);
   if (!receipt) return { error: "not-found", message: `No ${chain.name} transaction with this hash.` };
   const all = withdrawalsIn(receipt, chain);
@@ -121,12 +126,8 @@ export async function readFacts(chain, txHash, { l1, l2 }, { index = 0 } = {}) {
   facts.finalized = !!facts.finalizedBy;
 
   if (facts.finalized) {
-    try {
-      facts.claim = await findFinalizer(facts, chain, finBlock, l1, view);
-      if (!facts.claim) facts.claimLookup = "not-found";
-    } catch {
-      facts.claimLookup = "failed";
-    }
+    if (deferClaim) facts.claimLookup = "pending";
+    else Object.assign(facts, await claimOf(facts, { l1, l1Archive }, chain));
     return facts;
   }
 
@@ -164,6 +165,25 @@ export function encodeFinalizeDeposit(chainId, w, proof) {
   const offsetMessage = 7 * 32;
   const offsetProof = offsetMessage + bytes.length / 2;
   return FINALIZE_DEPOSIT + word(32n) + head + word(BigInt(offsetMessage)) + word(BigInt(offsetProof)) + bytes + word(BigInt(proof.length)) + proof.map(word).join("");
+}
+
+/**
+ * Who sent the finalize transaction of a finalized withdrawal: { claim, claimLookup }, like Arbitrum's claimOf.
+ * claimLookup is null when found, "not-found" when no single transaction matched, "failed" when no endpoint served
+ * the history.
+ */
+export async function claimOf(facts, { l1, l1Archive = l1 }, chain) {
+  const rpc = l1Archive;
+  const view = async (to, sig, args, at) => {
+    const r = await rpc("eth_call", [{ to, data: encodeCall(sig, args) }, at]);
+    return r && r.reverted ? null : r;
+  };
+  try {
+    const claim = await findFinalizer(facts, chain, facts.l1.block, rpc, view);
+    return { claim, claimLookup: claim ? null : "not-found" };
+  } catch {
+    return { claim: null, claimLookup: "failed" };
+  }
 }
 
 /**

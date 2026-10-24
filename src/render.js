@@ -47,11 +47,11 @@ export const claimedWhen = (c) => (c.timestamp ? utc(c.timestamp) : `in L1 block
 /** The last step's name: ZKsync and OP finalize, Arbitrum and Linea claim. */
 export const claimVerb = (v) => (v.state === "FINALIZED" ? "Finalized" : "Claimed");
 
-/** Who sent the last step and when; for Arbitrum also "still looking" or "could not tell". null when there is none. */
+/** Who sent the last step and when; "still looking" while it is searched, and for Arbitrum "could not tell". null when there is none. */
 export function claimLine(v, f) {
   if (v.claim) return `${claimedWhen(v.claim)} by ${whoIs(v.claim.by, f)}`;
+  if (f.claimLookup === "pending") return `Finding who ${claimVerb(v).toLowerCase()} it…`;
   if (!f.spent) return null;
-  if (f.claimLookup === "pending") return "Finding who claimed it…";
   if (f.claimLookup === "not-found") return "Could not tell: the claim's log was not in the range the RPCs returned.";
   return "Could not tell: finding it needs Ethereum history that no free RPC served.";
 }

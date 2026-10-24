@@ -222,7 +222,7 @@ function zksyncVerdict(f) {
     if (claim && sameAddress(claim.via, ZKSYNC.finalizer)) {
       notes.push(`Finalized automatically through the WithdrawalFinalizer contract (${ZKSYNC.finalizer}), which finishes most ZKsync withdrawals in batches.`);
     } else if (isThirdParty(claim, f.asset)) notes.push(thirdPartyNote("finalize transaction", "bridge"));
-    if (!claim && f.claimLookup) notes.push("Could not find who sent the finalize transaction: that needs historical state the free RPCs did not serve.");
+    if (!claim && f.claimLookup && f.claimLookup !== "pending") notes.push("Could not find who sent the finalize transaction: that needs historical state the free RPCs did not serve.");
     return {
       state: "FINALIZED", eta: null, who: null, action: null, notes, claim,
       summary: "Finalized on L1. The funds went to the recipient; nothing is left to do.",

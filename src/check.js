@@ -2,9 +2,9 @@
 import { CHAINS } from "./chains.js";
 import { makeRpc } from "./rpc.js";
 import { readFacts as readOpStack } from "./opstack.js";
-import { readFacts as readArbitrum, claimOf } from "./arbitrum.js";
+import { readFacts as readArbitrum, claimOf as claimOfArbitrum } from "./arbitrum.js";
 import { readFacts as readLinea } from "./linea.js";
-import { readFacts as readZksync } from "./zksync.js";
+import { readFacts as readZksync, claimOf as claimOfZksync } from "./zksync.js";
 import { verdict } from "./verdict.js";
 
 export function clientsFor(chain, opts = {}) {
@@ -14,6 +14,8 @@ export function clientsFor(chain, opts = {}) {
 }
 
 const READERS = { op: readOpStack, arbitrum: readArbitrum, linea: readLinea, zksync: readZksync };
+// The slow "who sent the last step" searches, run after the verdict when the page asks for deferExtras.
+const CLAIMERS = { arbitrum: claimOfArbitrum, zksync: claimOfZksync };
 
 /**
  * Check one withdrawal. `chain` is a key of CHAINS ("op", "base", "arb", "linea", "zksync") or "auto" (ask every
@@ -21,7 +23,7 @@ const READERS = { op: readOpStack, arbitrum: readArbitrum, linea: readLinea, zks
  * `clients(chain)` returns the { l1, l2, l1Archive? } RPC functions; tests pass recorded ones.
  *
  * With `deferExtras`, the answer comes back as soon as the verdict is known, and slow extras (who sent an Arbitrum
- * claim, which needs a search through Ethereum history) arrive later: `extras` is then a promise of the full result.
+ * claim or a ZKsync finalize, which need a search through Ethereum history) arrive later: `extras` is then a promise of the full result.
  * Without it (the CLI), everything is read first and there is no `extras`.
  */
 export async function check(txHash, { chain = "auto", index = 0, clients = (c) => clientsFor(c), deferExtras = false } = {}) {
@@ -35,7 +37,7 @@ export async function check(txHash, { chain = "auto", index = 0, clients = (c) =
     if (facts.error) return { chain: c, ...facts };
     const r = { chain: c, facts, verdict: verdict(facts) };
     if (facts.claimLookup === "pending") {
-      r.extras = claimOf(facts, cl).then((found) => {
+      r.extras = CLAIMERS[c.stack](facts, cl, c).then((found) => {
         const full = { ...facts, ...found };
         return { chain: c, facts: full, verdict: verdict(full) };
       });

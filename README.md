@@ -118,7 +118,8 @@ For each ZKsync Era withdrawal it reads, at the latest finalized Ethereum block:
    bridge, say whether it is done. If it is, the tool finds the first L1 block where the flag turned true (a four-way
    search on historical state, which needs an archive endpoint) and the one transaction in that block whose bridge logs
    name this recipient and amount: its sender, and whether it went through the WithdrawalFinalizer contract
-   (`0xf8a1…315e`) that finishes most ZKsync withdrawals in batches;
+   (`0xf8a1…315e`) that finishes most ZKsync withdrawals in batches. The page shows the verdict first and fills in
+   the sender when the search ends ("Finding who finalized it…");
 4. otherwise anyone can finalize: the tool dry-runs `L1Nullifier.finalizeDeposit(...)` with that proof as an `eth_call`
    at the finalized block (nothing is sent) and prints the call with every argument.
 
@@ -133,8 +134,8 @@ arb1.arbitrum.io, Blast's public endpoint and Nodies for Arbitrum One; rpc.linea
 mainnet.era.zksync.io for ZKsync Era (the `zks_` methods have no other keyless endpoint); PublicNode and MEV Blocker for
 Ethereum. All of them answer browsers (CORS). The lookups that reach back days or years (an Arbitrum assertion created
 about 6.4 days ago, the block a claim or finalization happened in, a Linea finalization from 2024) need historical logs
-and state, which PublicNode's free tier refuses. Arbitrum sends those straight to MEV Blocker, then Tenderly's public
-gateway; Linea and ZKsync reach MEV Blocker after PublicNode refuses. With "Find chain", every L2 is asked at once and
+and state, which PublicNode's free tier refuses. Arbitrum and ZKsync send those straight to MEV Blocker, then Tenderly's
+public gateway; Linea reaches MEV Blocker after PublicNode refuses. With "Find chain", every L2 is asked at once and
 the one that has the transaction answers. The endpoints are rate limited and offered as is; for heavy use, run your own
 node.
 

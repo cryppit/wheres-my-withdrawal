@@ -80,6 +80,7 @@ export const CHAINS = {
     // The proof and batch lookups are zks_ methods, which only ZKsync's own endpoint serves among the keyless ones.
     l2Rpcs: ["https://mainnet.era.zksync.io"],
     l1Rpcs: L1_RPCS,
+    l1ArchiveRpcs: L1_ARCHIVE_RPCS, // who finalized it: a search on old state, which PublicNode refuses
     diamond: "0x32400084c286cf3e17e7b677ea9583e60a000324",
     nullifier: "0xd7f9f54194c633f36ccd5f3da84ad4a1c38cb2cb",
     nativeTokenVault: "0xbed1eb542f9a5aa6419ff3deb921a372681111f6",

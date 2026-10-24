@@ -182,6 +182,7 @@ test("Arbitrum: spent, claimer still being looked up: done now, and no 'could no
 test("the claimer line: pending, found, or could not tell", () => {
   const f = arb({ spent: true });
   assert.equal(claimLine({ claim: null }, { ...f, claimLookup: "pending" }), "Finding who claimed it…");
+  assert.equal(claimLine({ state: "FINALIZED", claim: null }, { stack: "zksync", finalized: true, claimLookup: "pending" }), "Finding who finalized it…");
   assert.match(claimLine({ claim: null }, { ...f, claimLookup: "failed" }), /^Could not tell/);
   assert.match(claimLine({ claim: null }, { ...f, claimLookup: "not-found" }), /^Could not tell/);
   const claim = { by: "0xa77028cd034fae57dd4acb50ebcb9c074d569e64", block: BLOCK - 10, timestamp: T - 120 };

@@ -322,6 +322,23 @@ test("with deferExtras the verdict comes first and does not wait on the archive 
   assert.match(renderText(full), /unlost\.eth/);
 });
 
+test("ZKsync with deferExtras: the verdict comes first and does not wait on the archive search for the finalizer", { timeout: 5000 }, async () => {
+  const fx = load("zksync-finalized-by-unlost");
+  let release;
+  const gate = new Promise((ok) => (release = ok));
+  const slow = async (m, p) => { await gate; return replaying(fx.store.l1)(m, p); };
+  const r = await check(fx.tx, { chain: "zksync", deferExtras: true, clients: () => ({ l1: replaying(fx.store.l1), l2: replaying(fx.store.l2), l1Archive: slow }) });
+  assert.equal(r.verdict.state, "FINALIZED");
+  assert.equal(r.facts.claimLookup, "pending");
+  assert.equal(r.verdict.claim, null);
+  assert.ok(!r.verdict.notes.some((n) => /Could not find/.test(n)));
+  release();
+  const full = await r.extras;
+  assert.equal(full.verdict.claim.by, "0xa77028cd034fae57dd4acb50ebcb9c074d569e64");
+  assert.equal(full.facts.claimLookup, null);
+  assert.match(renderText(full), /finalized 2026-10-24 .*unlost\.eth/);
+});
+
 test("without deferExtras (the CLI) everything is read before the answer, and there is nothing left over", async () => {
   const r = await replay("arb-claimed-by-unlost");
   assert.equal(r.extras, undefined);

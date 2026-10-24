@@ -124,7 +124,7 @@
     out.append(card);
   }
 
-  // The verdict shows as soon as it is known; slow extras (who sent an Arbitrum claim) fill in when they arrive,
+  // The verdict shows as soon as it is known; slow extras (who sent an Arbitrum claim or a ZKsync finalize) fill in when they arrive,
   // unless the visitor has started another check by then.
   let runs = 0;
   async function run() {
