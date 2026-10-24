@@ -11,6 +11,8 @@ const LABEL = {
   CLAIMED: "DONE",
   READY_TO_CLAIM: "READY TO CLAIM",
   WAITING_FOR_CONFIRMATION: "WAITING",
+  WAITING_FOR_FINALIZATION: "WAITING",
+  WAITING_FOR_BATCH: "WAITING",
 };
 
 export const utc = (sec) => new Date(sec * 1000).toISOString().replace("T", " ").slice(0, 16) + " UTC";
@@ -26,7 +28,8 @@ export function formatUnits(v, decimals) {
   const s = v.toString().padStart(decimals + 1, "0");
   const whole = s.slice(0, s.length - decimals);
   const frac = s.slice(s.length - decimals).replace(/0+$/, "");
-  return frac ? `${whole}.${frac.slice(0, 8)}` : whole;
+  // Eight decimals, unless that would round a dust amount (a 1-wei withdrawal) down to zero.
+  return frac ? `${whole}.${/^0{8}/.test(frac) ? frac : frac.slice(0, 8)}` : whole;
 }
 
 /** Name an address: a known party, the withdrawal's own sender or recipient, or a third party. */
@@ -41,6 +44,17 @@ export function whoIs(address, f) {
 /** When a claim happened: its time if the RPC gave the block timestamp, otherwise its L1 block. */
 export const claimedWhen = (c) => (c.timestamp ? utc(c.timestamp) : `in L1 block ${c.block}`);
 
+/** The last step's name: ZKsync and OP finalize, Arbitrum and Linea claim. */
+export const claimVerb = (v) => (v.state === "FINALIZED" ? "Finalized" : "Claimed");
+
+/** One line about the proof behind the call, or null when the call needs none from us. */
+export function proofLine(f) {
+  const p = f.proof;
+  if (!p) return null;
+  if (f.stack === "zksync") return `${p.hashes.length} hashes from zks_getL2ToL1LogProof; a dry run of the call on L1 ${p.simulated ? "succeeded" : "failed"}`;
+  return `${p.hashes.length} hashes, root ${p.root} (confirmed on L1: ${p.rootConfirmed ? "yes" : "no"})`;
+}
+
 export function renderText(r) {
   if (r.error) return r.message;
   const { chain, facts: f, verdict: v } = r;
@@ -52,11 +66,11 @@ export function renderText(r) {
     `${LABEL[v.state]}  ${v.summary}`,
   ];
   if (v.proof) lines.push(`  proven ${utc(v.proof.provenAt)} by ${whoIs(v.proof.submitter, f)}`);
-  if (v.claim) lines.push(`  claimed ${claimedWhen(v.claim)} by ${whoIs(v.claim.by, f)}`);
+  if (v.claim) lines.push(`  ${claimVerb(v).toLowerCase()} ${claimedWhen(v.claim)} by ${whoIs(v.claim.by, f)}`);
   if (v.eta) lines.push(`  next step opens about ${utc(v.eta)}`);
   if (v.who === "anyone") lines.push(`  who can do it: anyone. The money only goes to ${f.asset.to ?? f.withdrawal.target}.`);
   if (v.action) lines.push(`  call: ${v.action}`);
-  if (v.action && f.proof) lines.push(`  proof: ${f.proof.hashes.length} hashes, root ${f.proof.root} (confirmed on L1: ${f.proof.rootConfirmed ? "yes" : "no"}); --json prints them`);
+  if (v.action && f.proof) lines.push(`  proof: ${proofLine(f)}; --json prints them`);
   for (const n of v.notes) lines.push(`  note: ${n}`);
   lines.push("", `Read from public RPCs at finalized Ethereum block ${f.l1.block} (${utc(f.l1.timestamp)}). Nothing was signed.`);
   return lines.join("\n");
