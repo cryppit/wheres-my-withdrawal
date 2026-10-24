@@ -1,7 +1,8 @@
 // One entry point for the CLI, the page and the tests: find the chain, read the facts, give the verdict.
 import { CHAINS } from "./chains.js";
 import { makeRpc } from "./rpc.js";
-import { readFacts } from "./opstack.js";
+import { readFacts as readOpStack } from "./opstack.js";
+import { readFacts as readArbitrum } from "./arbitrum.js";
 import { verdict } from "./verdict.js";
 
 export function clientsFor(chain, opts = {}) {
@@ -9,7 +10,7 @@ export function clientsFor(chain, opts = {}) {
 }
 
 /**
- * Check one withdrawal. `chain` is "op", "base" or "auto" (try each chain's L2 for the transaction).
+ * Check one withdrawal. `chain` is "op", "base", "arb" or "auto" (try each chain's L2 for the transaction).
  * `clients(chain)` returns the { l1, l2 } RPC functions; tests pass recorded ones.
  */
 export async function check(txHash, { chain = "auto", index = 0, clients = (c) => clientsFor(c) } = {}) {
@@ -18,7 +19,8 @@ export async function check(txHash, { chain = "auto", index = 0, clients = (c) =
   if (!candidates.length) return { error: "bad-chain", message: `Unknown chain "${chain}". Use: ${Object.keys(CHAINS).join(", ")}.` };
   let last = null;
   for (const c of candidates) {
-    const facts = await readFacts(c, txHash, clients(c), { index });
+    const read = c.stack === "arbitrum" ? readArbitrum : readOpStack;
+    const facts = await read(c, txHash, clients(c), { index });
     if (facts.error === "not-found") {
       last = facts;
       continue;

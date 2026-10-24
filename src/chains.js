@@ -1,6 +1,7 @@
 // Chain profiles. Addresses are the L1 contracts each chain publishes (OP: superchain-registry op.toml; Base:
-// docs.base.org Base contracts, since Base left the registry on 2026-04-27). The anchor state registry and the dispute
-// game factory are read from the portal at run time, because upgrades have moved them before.
+// docs.base.org Base contracts, since Base left the registry on 2026-04-27; Arbitrum: docs.arbitrum.io useful
+// addresses, checked on chain on 2026-10-24: Bridge.rollup() and Outbox.rollup() both name this rollup). The anchor
+// state registry, the dispute game factory and the Arbitrum Outbox are read at run time, because upgrades move them.
 //
 // Public RPCs only, no keys. Each list is tried in order. dRPC and 1RPC are never used.
 
@@ -10,6 +11,7 @@ export const CHAINS = {
   op: {
     id: "op",
     name: "OP Mainnet",
+    stack: "op",
     l2ChainId: 10,
     l2Rpcs: ["https://mainnet.optimism.io", "https://optimism-rpc.publicnode.com"],
     l1Rpcs: L1_RPCS,
@@ -23,6 +25,7 @@ export const CHAINS = {
   base: {
     id: "base",
     name: "Base",
+    stack: "op",
     l2ChainId: 8453,
     l2Rpcs: ["https://mainnet.base.org", "https://base-rpc.publicnode.com"],
     l1Rpcs: L1_RPCS,
@@ -33,6 +36,27 @@ export const CHAINS = {
     cadenceSec: 1200,
     explorer: "https://basescan.org/tx/",
   },
+  arb: {
+    id: "arb",
+    name: "Arbitrum One",
+    stack: "arbitrum",
+    l2ChainId: 42161,
+    // arb1 serves old receipts and wide log ranges. Blast's public endpoint is the browser fallback (it sends CORS
+    // headers); Nodies works from the CLI only. PublicNode's Arbitrum endpoint refuses receipts older than a few hours.
+    l2Rpcs: ["https://arb1.arbitrum.io/rpc", "https://arbitrum-one.public.blastapi.io", "https://arb-pokt.nodies.app"],
+    l1Rpcs: L1_RPCS,
+    rollup: "0x4dceb440657f21083db8add07665f8ddbe1dcfc0",
+    l1GatewayRouter: "0x72ce9c846789fdb6fc1f34ac4ad25dd9ef7031ef",
+    // About one assertion an hour (20 AssertionCreated logs in 6,000 L1 blocks, measured 24 Oct 2026).
+    cadenceSec: 3600,
+    explorer: "https://arbiscan.io/tx/",
+  },
+};
+
+// Arbitrum precompiles on L2: ArbSys emits L2ToL1Tx; NodeInterface (a virtual contract, eth_call only) builds proofs.
+export const ARBITRUM = {
+  arbSys: "0x0000000000000000000000000000000000000064",
+  nodeInterface: "0x00000000000000000000000000000000000000c8",
 };
 
 // L2 predeploys, the same on every OP Stack chain.
@@ -52,7 +76,8 @@ export const FEE_VAULTS = [
 ];
 
 // Addresses we can name in a report. unlost.eth proves and finishes old withdrawals for others and then asks the
-// owner for a tip (seen on Arbitrum, ZKsync, Linea, Scroll, Starknet and OP Mainnet since 22 Oct 2026).
+// owner for a tip (seen on Arbitrum, ZKsync, Linea, Scroll, Starknet and OP Mainnet since 22 Oct 2026; on Arbitrum it
+// sends Outbox.executeTransaction itself, e.g. for position 44574 in L1 block 26254525).
 export const KNOWN = {
   "0xa77028cd034fae57dd4acb50ebcb9c074d569e64": "unlost.eth, a third party that finishes old withdrawals and asks the owner for a tip",
 };

@@ -97,3 +97,83 @@ test("a proof sent in the same second the game was created does not count", () =
 test("fee-vault withdrawals are labelled as protocol revenue", () => {
   assert.ok(verdict(base({ feeVault: true })).notes.some((n) => /fee vault/i.test(n)));
 });
+
+// Arbitrum One: L2ToL1Tx, then a BoLD assertion that includes it is confirmed, then anyone claims it from the Outbox.
+const BLOCK = 26_000_000; // the finalized L1 block the reads are pinned to
+const arb = (over = {}) => ({
+  chain: "arb",
+  stack: "arbitrum",
+  l2: { txHash: "0x" + "1".repeat(64), blockNumber: 500_000_000, timestamp: T - 3 * DAY, withdrawals: 1, index: 0 },
+  withdrawal: {
+    hash: "0x" + "2".repeat(64), position: 167_000, sender: "0x" + "3".repeat(40), target: "0x" + "3".repeat(40),
+    value: 10n ** 18n, arbBlockNum: 500_000_000, ethBlockNum: BLOCK - 21_600, timestamp: T - 3 * DAY, data: "0x",
+  },
+  asset: { kind: "eth", amount: 10n ** 18n, from: "0x" + "3".repeat(40), to: "0x" + "3".repeat(40) },
+  feeVault: false,
+  l1: { block: BLOCK, timestamp: T },
+  config: { confirmPeriodBlocks: 45_818, l1BlockSec: 12, cadenceSec: 3600, anyoneCanConfirm: true },
+  spent: false, claim: null, claimLookup: null,
+  confirmed: { assertion: "0x" + "a".repeat(64), l2Block: 499_000_000, sendCount: 166_900, covered: false },
+  covering: { assertion: "0x" + "b".repeat(64), createdAtBlock: BLOCK - 21_000, deadlineBlock: BLOCK - 21_000 + 45_818 },
+  proof: null,
+  ...over,
+});
+
+test("Arbitrum: included in an assertion, window running: waiting until its deadline block", () => {
+  const v = verdict(arb());
+  assert.equal(v.state, "WAITING_FOR_CONFIRMATION");
+  assert.equal(v.who, null);
+  assert.equal(v.eta, T + (45_818 - 21_000) * 12);
+  assert.match(v.summary, /6\.4-day/);
+});
+
+test("Arbitrum: no assertion includes it yet: next assertion plus the full window", () => {
+  const v = verdict(arb({ covering: null }));
+  assert.equal(v.state, "WAITING_FOR_CONFIRMATION");
+  assert.equal(v.eta, T + 3600 + 45_818 * 12);
+});
+
+test("Arbitrum: window over but not confirmed yet: due now, and anyone may confirm on Arbitrum One", () => {
+  const v = verdict(arb({ covering: { assertion: "0x" + "b".repeat(64), createdAtBlock: BLOCK - 46_000, deadlineBlock: BLOCK - 182 } }));
+  assert.equal(v.state, "WAITING_FOR_CONFIRMATION");
+  assert.equal(v.eta, T);
+  assert.ok(v.notes.some((n) => /confirmAssertion/.test(n)));
+});
+
+test("Arbitrum: confirmed and not spent: anyone can claim it from the Outbox", () => {
+  const v = verdict(arb({ confirmed: { assertion: "0x" + "a".repeat(64), l2Block: 501_000_000, sendCount: 167_100, covered: true }, covering: null }));
+  assert.equal(v.state, "READY_TO_CLAIM");
+  assert.equal(v.who, "anyone");
+  assert.equal(v.eta, null);
+  assert.match(v.action, /^Outbox\.executeTransaction\(.*167000/);
+});
+
+test("Arbitrum: spent, claimed by the recipient: done, no third-party note", () => {
+  const claim = { by: "0x" + "3".repeat(40), txHash: "0x" + "c".repeat(64), block: BLOCK - 10, timestamp: T - 120 };
+  const v = verdict(arb({ spent: true, claim }));
+  assert.equal(v.state, "CLAIMED");
+  assert.equal(v.who, null);
+  assert.deepEqual(v.claim, claim);
+  assert.ok(!v.notes.some((n) => /owed/.test(n)));
+});
+
+test("Arbitrum: spent, claimed by someone else: done, and nothing is owed to them", () => {
+  const claim = { by: "0xa77028cd034fae57dd4acb50ebcb9c074d569e64", txHash: "0x" + "c".repeat(64), block: BLOCK - 10, timestamp: T - 120 };
+  const v = verdict(arb({ spent: true, claim }));
+  assert.equal(v.state, "CLAIMED");
+  assert.ok(v.notes.some((n) => /nothing is owed/i.test(n)));
+});
+
+test("Arbitrum: spent, claimer not found with free RPCs: done, and it says so", () => {
+  const v = verdict(arb({ spent: true, claim: null, claimLookup: "failed" }));
+  assert.equal(v.state, "CLAIMED");
+  assert.equal(v.claim, null);
+  assert.ok(v.notes.some((n) => /who sent the claim/.test(n)));
+});
+
+test("Arbitrum: ready, but the L2 RPC's proof does not check out on L1: still ready, with a warning", () => {
+  const proof = { size: 167_100, leaf: "0x" + "9".repeat(64), root: "0x" + "8".repeat(64), hashes: ["0x" + "7".repeat(64)], leafMatches: false, rootConfirmed: false };
+  const v = verdict(arb({ confirmed: { assertion: "0x" + "a".repeat(64), l2Block: 501_000_000, sendCount: 167_100, covered: true }, covering: null, proof }));
+  assert.equal(v.state, "READY_TO_CLAIM");
+  assert.ok(v.notes.some((n) => /proof .* did not check out/.test(n)));
+});

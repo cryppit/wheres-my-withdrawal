@@ -1,6 +1,6 @@
 // Reads everything verdict() needs for one OP Stack withdrawal (OP Mainnet, Base), starting from its L2 transaction hash.
 // Every L1 read is pinned to the finalized block, so one answer never mixes two moments.
-import { encodeCall, selector, topic, wordAt, uintAt, addressAt, boolAt, decodeBytes, keccakHex, sameAddress } from "./abi.js";
+import { encodeCall, selector, topic, wordAt, uintAt, addressAt, boolAt, decodeBytes, decodeString, keccakHex, sameAddress } from "./abi.js";
 import { PREDEPLOYS, FEE_VAULTS, SUPER_GAME_TYPES } from "./chains.js";
 
 const MESSAGE_PASSED = topic("MessagePassed(uint256,address,address,uint256,uint256,bytes,bytes32)");
@@ -149,13 +149,4 @@ async function readGame(address, asr, view) {
     claimValid: boolAt(valid, 0),
     ...(expected ? { expectedResolution: num(expected) } : {}),
   };
-}
-
-function decodeString(hex) {
-  try {
-    const raw = decodeBytes(hex, 0).slice(2);
-    return new TextDecoder().decode(Uint8Array.from(raw.match(/.{2}/g) ?? [], (b) => parseInt(b, 16)));
-  } catch {
-    return null;
-  }
 }

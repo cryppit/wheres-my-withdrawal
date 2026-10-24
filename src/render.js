@@ -8,6 +8,9 @@ const LABEL = {
   WAITING_TO_FINALIZE: "WAITING",
   READY_TO_PROVE: "READY TO PROVE",
   WAITING_FOR_GAME: "WAITING",
+  CLAIMED: "DONE",
+  READY_TO_CLAIM: "READY TO CLAIM",
+  WAITING_FOR_CONFIRMATION: "WAITING",
 };
 
 export const utc = (sec) => new Date(sec * 1000).toISOString().replace("T", " ").slice(0, 16) + " UTC";
@@ -35,6 +38,9 @@ export function whoIs(address, f) {
   return `${a} (a third party; the money still goes only to the recipient)`;
 }
 
+/** When a claim happened: its time if the RPC gave the block timestamp, otherwise its L1 block. */
+export const claimedWhen = (c) => (c.timestamp ? utc(c.timestamp) : `in L1 block ${c.block}`);
+
 export function renderText(r) {
   if (r.error) return r.message;
   const { chain, facts: f, verdict: v } = r;
@@ -46,9 +52,11 @@ export function renderText(r) {
     `${LABEL[v.state]}  ${v.summary}`,
   ];
   if (v.proof) lines.push(`  proven ${utc(v.proof.provenAt)} by ${whoIs(v.proof.submitter, f)}`);
+  if (v.claim) lines.push(`  claimed ${claimedWhen(v.claim)} by ${whoIs(v.claim.by, f)}`);
   if (v.eta) lines.push(`  next step opens about ${utc(v.eta)}`);
   if (v.who === "anyone") lines.push(`  who can do it: anyone. The money only goes to ${f.asset.to ?? f.withdrawal.target}.`);
   if (v.action) lines.push(`  call: ${v.action}`);
+  if (v.action && f.proof) lines.push(`  proof: ${f.proof.hashes.length} hashes, root ${f.proof.root} (confirmed on L1: ${f.proof.rootConfirmed ? "yes" : "no"}); --json prints them`);
   for (const n of v.notes) lines.push(`  note: ${n}`);
   lines.push("", `Read from public RPCs at finalized Ethereum block ${f.l1.block} (${utc(f.l1.timestamp)}). Nothing was signed.`);
   return lines.join("\n");
