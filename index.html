@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Where's My Withdrawal</title>
+<meta name="description" content="Paste an OP Mainnet or Base withdrawal: see what step is missing, when it opens and who can do it. Read-only, no keys.">
+<style>
+  :root {
+    --bg: #070b22; --deep: #04061a; --panel: #0c1236; --line: rgba(154, 163, 199, 0.2);
+    --ink: #f4f1e8; --mute: #9aa3c7; --lime: #ddf24a; --amber: #ffb547; --red: #ff6b6b; --blue: #8fb4ff;
+    --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    color-scheme: dark;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: radial-gradient(1100px 600px at 80% -10%, rgba(42, 59, 214, 0.28), transparent 60%), var(--deep); color: var(--ink); font: 16px/1.55 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  a { color: var(--lime); text-underline-offset: 3px; }
+  main { max-width: 860px; margin: 0 auto; padding: 40px 16px 64px; }
+  .kicker { font: 600 13px/1 var(--mono); letter-spacing: 0.18em; text-transform: uppercase; color: var(--mute); margin: 0 0 12px; }
+  h1 { font-size: clamp(30px, 6vw, 46px); line-height: 1.1; margin: 0 0 12px; text-wrap: balance; }
+  .lead { color: var(--mute); max-width: 680px; margin: 0 0 24px; }
+  form { display: flex; gap: 10px; flex-wrap: wrap; }
+  input { flex: 1 1 420px; min-width: 0; background: var(--panel); color: var(--ink); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; font: 15px var(--mono); }
+  input:focus-visible, button:focus-visible, select:focus-visible { outline: 2px solid var(--lime); outline-offset: 2px; }
+  select { background: var(--panel); color: var(--ink); border: 1px solid var(--line); border-radius: 12px; padding: 0 12px; font: 15px system-ui; min-height: 50px; }
+  button.go { background: var(--lime); color: #04061a; border: 0; border-radius: 12px; padding: 0 22px; font: 700 15px system-ui; cursor: pointer; min-height: 50px; }
+  button.go:disabled { opacity: 0.6; cursor: wait; }
+  .samples { display: flex; flex-wrap: wrap; gap: 8px; margin: 14px 0 0; color: var(--mute); font-size: 14px; align-items: center; }
+  .samples button { background: transparent; color: var(--ink); border: 1px solid var(--line); border-radius: 999px; padding: 6px 12px; font: 13px system-ui; cursor: pointer; }
+  .samples button:hover { border-color: var(--lime); }
+  #out { margin-top: 28px; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 16px; padding: 22px; }
+  .card header { display: flex; flex-wrap: wrap; gap: 10px 14px; align-items: center; margin-bottom: 14px; }
+  .pill { font: 700 12px var(--mono); letter-spacing: 0.08em; text-transform: uppercase; border-radius: 999px; padding: 5px 11px; border: 1px solid; white-space: nowrap; }
+  .s-done { color: var(--lime); } .s-ready { color: var(--amber); } .s-wait { color: var(--blue); } .s-bad { color: var(--red); }
+  .summary { font-size: 18px; margin: 0 0 16px; }
+  dl { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 8px 18px; margin: 0; }
+  dt { color: var(--mute); font-size: 14px; }
+  dd { margin: 0; font-size: 15px; overflow-wrap: anywhere; }
+  .mono { font-family: var(--mono); font-size: 13.5px; }
+  .eta { font: 700 22px var(--mono); }
+  .note { border-left: 2px solid var(--amber); padding: 4px 0 4px 12px; color: var(--ink); margin: 14px 0 0; font-size: 15px; }
+  .foot { color: var(--mute); font-size: 13.5px; margin-top: 16px; }
+  .err { border-color: var(--red); }
+  .about { margin-top: 48px; color: var(--mute); font-size: 15px; display: grid; gap: 10px; }
+  .about strong { color: var(--ink); }
+  @media (max-width: 560px) { dl { grid-template-columns: minmax(0, 1fr); gap: 2px 0; } dd { margin-bottom: 10px; } }
+</style>
+</head>
+<body>
+<main>
+  <p class="kicker">Cryppit · read-only · no keys</p>
+  <h1>Where's My Withdrawal</h1>
+  <p class="lead">Paste the OP Mainnet or Base transaction that started your withdrawal to Ethereum. See whether it is done, what step is missing, when it opens, and who can do it.</p>
+
+  <form id="f">
+    <input id="tx" name="tx" placeholder="0x… L2 transaction hash" autocomplete="off" spellcheck="false" aria-label="L2 transaction hash">
+    <select id="chain" aria-label="Chain"><option value="auto">Find chain</option><option value="op">OP Mainnet</option><option value="base">Base</option></select>
+    <button class="go" id="go" type="submit">Check</button>
+  </form>
+  <div class="samples">Try:
+    <button type="button" data-tx="0x6dd4496a80c39a43a34d41d84e38ff7f9f6d3b3daf312c5e01f3aa325d1ed970">0.076 ETH from 2023</button>
+    <button type="button" data-tx="0xafb31a144d76abfe507df920dc222f2675a562839d8639e9cbace056ab598430">Proven by a third party</button>
+    <button type="button" data-tx="0x95e78c5563149643456198b291f78f6bcfa78488268f440ab88e3dfc59bcb46d">A Base withdrawal</button>
+  </div>
+
+  <div id="out" aria-live="polite"></div>
+
+  <section class="about">
+    <p><strong>Anyone can finish a withdrawal.</strong> On OP Mainnet and Base, proving and finalizing are open to any address, and the money only ever goes to the withdrawal's recipient.</p>
+    <p><strong>Someone else may already have.</strong> Some services now prove and finish old withdrawals for others and then ask the owner for a tip. You owe nothing: the funds reach the recipient either way.</p>
+    <p><strong>How it reads.</strong> Your browser asks public RPCs directly, at the latest finalized Ethereum block. No wallet, no keys, nothing signed. <a href="https://github.com/cryppit/wheres-my-withdrawal">Source</a>.</p>
+  </section>
+</main>
+<script type="module">
+  import { check } from "./src/check.js";
+  import { formatAmount, utc, whoIs } from "./src/render.js";
+
+  const $ = (id) => document.getElementById(id);
+  const PILL = {
+    FINALIZED: ["Done", "s-done"], RELAY_FAILED: ["Needs a replay", "s-bad"], READY_TO_FINALIZE: ["Ready to finalize", "s-ready"],
+    WAITING_TO_FINALIZE: ["Waiting", "s-wait"], READY_TO_PROVE: ["Ready to prove", "s-ready"], WAITING_FOR_GAME: ["Waiting", "s-wait"],
+  };
+  const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
+  const row = (dl, k, v, mono) => { dl.append(el("dt", null, k)); const d = el("dd", mono ? "mono" : null); typeof v === "string" ? (d.textContent = v) : d.append(v); dl.append(d); };
+  const link = (href, text) => { const a = el("a", "mono", text); a.href = href; a.target = "_blank"; a.rel = "noopener"; return a; };
+
+  function left(sec) {
+    const s = sec - Date.now() / 1000;
+    if (s <= 0) return "now (check again)";
+    const d = Math.floor(s / 86400), h = Math.floor((s % 86400) / 3600), m = Math.floor((s % 3600) / 60);
+    return d ? `in ${d} d ${h} h` : h ? `in ${h} h ${m} min` : `in ${m} min`;
+  }
+
+  function show(r) {
+    const out = $("out");
+    out.replaceChildren();
+    const card = el("div", "card");
+    if (r.error) { card.classList.add("err"); card.append(el("p", "summary", r.message)); out.append(card); return; }
+    const { chain, facts: f, verdict: v } = r;
+    const [label, cls] = PILL[v.state];
+    const head = el("header");
+    head.append(el("span", `pill ${cls}`, label), el("span", null, `${chain.name} · ${formatAmount(f.asset)}`));
+    card.append(head, el("p", "summary", v.summary));
+    const dl = el("dl");
+    if (v.eta) { const e = el("span", "eta", left(v.eta)); const w = el("span"); w.append(e, el("span", null, `  ${utc(v.eta)}`)); row(dl, "Next step opens", w); }
+    if (v.who === "anyone") row(dl, "Who can do it", "Anyone. The money only goes to the recipient.");
+    if (f.asset.to) row(dl, "Recipient", f.asset.to, true);
+    if (v.proof) row(dl, "Proven", `${utc(v.proof.provenAt)} by ${whoIs(v.proof.submitter, f)}`);
+    if (v.action) row(dl, "The call", v.action, true);
+    row(dl, "Started", `${utc(f.l2.timestamp)}, L2 block ${f.l2.blockNumber}`);
+    row(dl, "Transaction", link(chain.explorer + f.l2.txHash, f.l2.txHash));
+    card.append(dl);
+    for (const n of v.notes) card.append(el("p", "note", n));
+    card.append(el("p", "foot", `Read from public RPCs at finalized Ethereum block ${f.l1.block} (${utc(f.l1.timestamp)}). Nothing was signed.`));
+    out.append(card);
+  }
+
+  async function run() {
+    const tx = $("tx").value.trim();
+    $("go").disabled = true;
+    $("out").replaceChildren(el("p", "foot", "Reading Ethereum and the L2…"));
+    try { show(await check(tx, { chain: $("chain").value })); }
+    catch (e) { show({ error: "rpc", message: `The public RPCs did not answer (${e.message}). Try again in a minute.` }); }
+    finally { $("go").disabled = false; }
+  }
+
+  $("f").addEventListener("submit", (e) => { e.preventDefault(); run(); });
+  for (const b of document.querySelectorAll(".samples button")) b.addEventListener("click", () => { $("tx").value = b.dataset.tx; $("chain").value = "auto"; run(); });
+</script>
+</body>
+</html>
