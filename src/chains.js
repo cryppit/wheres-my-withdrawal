@@ -1,7 +1,9 @@
 // Chain profiles. Addresses are the L1 contracts each chain publishes (OP: superchain-registry op.toml; Base:
 // docs.base.org Base contracts, since Base left the registry on 2026-04-27; Arbitrum: docs.arbitrum.io useful
-// addresses, checked on chain on 2026-10-24: Bridge.rollup() and Outbox.rollup() both name this rollup). The anchor
-// state registry, the dispute game factory and the Arbitrum Outbox are read at run time, because upgrades move them.
+// addresses, checked on chain on 2026-10-24: Bridge.rollup() and Outbox.rollup() both name this rollup; Linea:
+// docs.linea.build, checked on chain on 2026-10-24: each TokenBridge's messageService() and remoteSender() name the
+// others; ZKsync: zks_getBridgeContracts and zks_getMainContract, and L1AssetRouter.L1_NULLIFIER()). The anchor state
+// registry, the dispute game factory and the Arbitrum Outbox are read at run time, because upgrades move them.
 //
 // Public RPCs only, no keys. Each list is tried in order. dRPC and 1RPC are never used.
 
@@ -56,12 +58,50 @@ export const CHAINS = {
     cadenceSec: 3600,
     explorer: "https://arbiscan.io/tx/",
   },
+  linea: {
+    id: "linea",
+    name: "Linea",
+    stack: "linea",
+    l2ChainId: 59144,
+    // rpc.linea.build serves old receipts and 10,000-block log ranges; PublicNode serves receipts but no logs.
+    l2Rpcs: ["https://rpc.linea.build", "https://linea-rpc.publicnode.com"],
+    l1Rpcs: L1_RPCS,
+    rollup: "0xd19d4b5d358258f05d7b411e21a1460d11b0876f",
+    l2MessageService: "0x508ca82df566dcd1b0de8296e70a96332cd644ec",
+    l2TokenBridge: "0x353012dc4a9a6cf55c941badc267f82004a8ceb9",
+    l1TokenBridge: "0x051f1d88f0af5763fb888ec4378b4d8b29ea3319",
+    explorer: "https://lineascan.build/tx/",
+  },
+  zksync: {
+    id: "zksync",
+    name: "ZKsync Era",
+    stack: "zksync",
+    l2ChainId: 324,
+    // The proof and batch lookups are zks_ methods, which only ZKsync's own endpoint serves among the keyless ones.
+    l2Rpcs: ["https://mainnet.era.zksync.io"],
+    l1Rpcs: L1_RPCS,
+    diamond: "0x32400084c286cf3e17e7b677ea9583e60a000324",
+    nullifier: "0xd7f9f54194c633f36ccd5f3da84ad4a1c38cb2cb",
+    nativeTokenVault: "0xbed1eb542f9a5aa6419ff3deb921a372681111f6",
+    l1LegacyBridge: "0x57891966931eb4bb6fb81430e6ce0a03aabde063",
+    l2LegacyBridge: "0x11f943b2c77b743ab90f4a0ae7d5a4e7fca3e102",
+    explorer: "https://explorer.zksync.io/tx/",
+  },
 };
 
 // Arbitrum precompiles on L2: ArbSys emits L2ToL1Tx; NodeInterface (a virtual contract, eth_call only) builds proofs.
 export const ARBITRUM = {
   arbSys: "0x0000000000000000000000000000000000000064",
   nodeInterface: "0x00000000000000000000000000000000000000c8",
+};
+
+// ZKsync Era system contracts on L2, and the batch finalizer on L1 (verified source "WithdrawalFinalizer"; it sent most
+// L1 finalizations in a 24 h sample on 24 Oct 2026).
+export const ZKSYNC = {
+  l1Messenger: "0x0000000000000000000000000000000000008008",
+  baseToken: "0x000000000000000000000000000000000000800a",
+  assetRouter: "0x0000000000000000000000000000000000010003",
+  finalizer: "0xf8a16864d8de145a266a534174305f881ee2315e",
 };
 
 // L2 predeploys, the same on every OP Stack chain.

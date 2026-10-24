@@ -3,6 +3,8 @@ import { CHAINS } from "./chains.js";
 import { makeRpc } from "./rpc.js";
 import { readFacts as readOpStack } from "./opstack.js";
 import { readFacts as readArbitrum, claimOf } from "./arbitrum.js";
+import { readFacts as readLinea } from "./linea.js";
+import { readFacts as readZksync } from "./zksync.js";
 import { verdict } from "./verdict.js";
 
 export function clientsFor(chain, opts = {}) {
@@ -11,8 +13,11 @@ export function clientsFor(chain, opts = {}) {
   return clients;
 }
 
+const READERS = { op: readOpStack, arbitrum: readArbitrum, linea: readLinea, zksync: readZksync };
+
 /**
- * Check one withdrawal. `chain` is "op", "base", "arb" or "auto" (ask every chain's L2 for the transaction at once).
+ * Check one withdrawal. `chain` is a key of CHAINS ("op", "base", "arb", "linea", "zksync") or "auto" (ask every
+ * chain's L2 for the transaction at once).
  * `clients(chain)` returns the { l1, l2, l1Archive? } RPC functions; tests pass recorded ones.
  *
  * With `deferExtras`, the answer comes back as soon as the verdict is known, and slow extras (who sent an Arbitrum
@@ -26,8 +31,7 @@ export async function check(txHash, { chain = "auto", index = 0, clients = (c) =
 
   const attempt = async (c) => {
     const cl = clients(c);
-    const read = c.stack === "arbitrum" ? readArbitrum : readOpStack;
-    const facts = await read(c, txHash, cl, { index, deferClaim: deferExtras });
+    const facts = await READERS[c.stack](c, txHash, cl, { index, deferClaim: deferExtras });
     if (facts.error) return { chain: c, ...facts };
     const r = { chain: c, facts, verdict: verdict(facts) };
     if (facts.claimLookup === "pending") {

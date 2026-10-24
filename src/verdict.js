@@ -1,6 +1,7 @@
 // From the facts read on chain to one answer: the state, when the next step opens, who may take it, and the exact call.
 // Pure: no clock, no network. Every condition is judged at the finalized L1 block the facts were read at (facts.l1).
 import { sameAddress } from "./abi.js";
+import { ZKSYNC } from "./chains.js";
 
 const CHALLENGER_WINS = 1;
 const DEFENDER_WINS = 2;
@@ -26,6 +27,8 @@ function gameReadyAt(g, config) {
 
 export function verdict(f) {
   if (f.stack === "arbitrum") return arbitrumVerdict(f);
+  if (f.stack === "linea") return lineaVerdict(f);
+  if (f.stack === "zksync") return zksyncVerdict(f);
   const t = f.l1.timestamp;
   const notes = [];
   if (f.feeVault) notes.push("This is a fee vault withdrawal: protocol revenue moving to L1, not a user's funds.");
@@ -137,5 +140,111 @@ function arbitrumVerdict(f) {
   return {
     state: "WAITING_FOR_CONFIRMATION", eta: t + left * c.l1BlockSec, who: null, notes, action: null,
     summary: `Included in an assertion on L1 (created at block ${f.covering.createdAtBlock}). Waiting for its ${windowText} challenge window to end; then anyone can claim it.`,
+  };
+}
+
+const isThirdParty = (claim, asset) => !!claim && !sameAddress(claim.by, asset.to) && !sameAddress(claim.by, asset.from);
+const thirdPartyNote = (step, payer) =>
+  `Someone other than the sender or the recipient sent the ${step}. The ${payer} paid the recipient regardless; nothing is owed to whoever sent it.`;
+
+const LINEA_APP_DAYS = 90;
+const eth = (wei) => {
+  const s = wei.toString().padStart(19, "0");
+  const frac = s.slice(-18).replace(/0+$/, "");
+  return `${s.slice(0, -18)}${frac ? "." + frac.slice(0, 6) : ""} ETH`;
+};
+
+/**
+ * Linea. A withdrawal is a MessageSent on L2; it can be claimed once the L1 rollup has finalized its L2 block
+ * (currentL2BlockNumber >= block), and nothing claims L2-to-L1 messages automatically. Messages from before L2 block
+ * 2,242,568 use the legacy claimMessage and need no proof.
+ */
+function lineaVerdict(f) {
+  const t = f.l1.timestamp;
+  const { withdrawal: w, config: c } = f;
+  const notes = [];
+
+  if (f.claimed) {
+    if (isThirdParty(f.claim, f.asset)) notes.push(thirdPartyNote("claim", "rollup"));
+    if (!f.claim && f.claimLookup) notes.push("Could not find who sent the claim: the free RPCs did not return its log.");
+    return {
+      state: "CLAIMED", eta: null, who: null, action: null, notes, claim: f.claim,
+      summary: "Claimed on L1. The funds went to the recipient; nothing is left to do.",
+    };
+  }
+
+  if (!f.finalized) {
+    const lag = c.finalizedL2Timestamp != null ? t - c.finalizedL2Timestamp : 0;
+    return {
+      state: "WAITING_FOR_FINALIZATION", eta: Math.max(t, f.l2.timestamp + lag), who: null, notes, action: null,
+      summary: "Waiting for Linea to finalize this block on Ethereum. Then anyone can claim it on L1; nothing claims it automatically.",
+    };
+  }
+
+  if (w.fee > 0n) {
+    notes.push(`The ${eth(w.fee)} fee paid on Linea goes to whoever sends the claim (for plain ETH to a wallet, only the claim's gas cost; the rest is refunded to the recipient).`);
+  }
+  if (t - f.l2.timestamp > LINEA_APP_DAYS * 86400) {
+    notes.push(`The Linea bridge app stops listing unclaimed withdrawals after ${LINEA_APP_DAYS} days. The call below still works.`);
+  }
+  const r = c.rateLimit;
+  const used = r.periodEnd >= t ? r.usedWei : 0n;
+  if (w.value + w.fee > r.limitWei - used) {
+    notes.push(`Claims on L1 share a daily limit of ${eth(r.limitWei)}; ${eth(used)} is used this period, so a claim this size reverts until the period ends.`);
+  }
+  if (c.paused) notes.push("Claims are paused on L1 right now. The call below reverts until they are resumed.");
+  if (!w.legacy && !f.proof) notes.push("Could not rebuild the Merkle proof from the public RPCs. The Linea SDK's getMessageProof builds it.");
+  if (f.proof && !f.proof.rootConfirmed) {
+    notes.push("The proof rebuilt from the finalization did not check out against the roots the L1 rollup accepts. Build it again before sending the claim.");
+  }
+
+  const data = w.data === "0x" ? "0x" : "data";
+  const action = w.legacy
+    ? `LineaRollup.claimMessage(${w.from}, ${w.to}, ${w.fee}, ${w.value}, feeRecipient (any address, or 0x0 for the sender), ${data}, ${w.nonce})`
+    : `LineaRollup.claimMessageWithProof({proof: ${f.proof ? `${f.proof.hashes.length} hashes` : "the Merkle proof"}, messageNumber: ${w.nonce}, leafIndex: ${f.proof?.leafIndex ?? "?"}, from: ${w.from}, to: ${w.to}, fee: ${w.fee}, value: ${w.value}, feeRecipient: any address (0x0 pays the sender), merkleRoot: ${f.proof?.root ?? "?"}, data: ${data}})`;
+  return {
+    state: "READY_TO_CLAIM", eta: null, who: "anyone", notes, action,
+    summary: "Finalized on L1 and ready to claim. Anyone can send the claim; the funds go only to the withdrawal's recipient. Nothing claims it automatically.",
+  };
+}
+
+/**
+ * ZKsync Era. A withdrawal is an L2-to-L1 message from a bridge contract in batch N. Once N is executed on L1, anyone
+ * can finalize it on the L1Nullifier; a batch finalizer finishes most of them automatically.
+ */
+function zksyncVerdict(f) {
+  const t = f.l1.timestamp;
+  const { withdrawal: w, batch: b, latest: l } = f;
+  const notes = [];
+
+  if (f.finalized) {
+    const claim = f.claim;
+    if (claim && sameAddress(claim.via, ZKSYNC.finalizer)) {
+      notes.push(`Finalized automatically through the WithdrawalFinalizer contract (${ZKSYNC.finalizer}), which finishes most ZKsync withdrawals in batches.`);
+    } else if (isThirdParty(claim, f.asset)) notes.push(thirdPartyNote("finalize transaction", "bridge"));
+    if (!claim && f.claimLookup) notes.push("Could not find who sent the finalize transaction: that needs historical state the free RPCs did not serve.");
+    return {
+      state: "FINALIZED", eta: null, who: null, action: null, notes, claim,
+      summary: "Finalized on L1. The funds went to the recipient; nothing is left to do.",
+    };
+  }
+
+  if (!b.executed) {
+    // The latest executed batch says how long batches take right now: commit to execute, or batch time to execute.
+    const eta = b.committedAt != null ? b.committedAt + (l.executedAt - l.committedAt) : f.l2.timestamp + (l.executedAt - l.timestamp);
+    return {
+      state: "WAITING_FOR_BATCH", eta: Math.max(t, eta), who: null, notes, action: null,
+      summary: `Waiting for its batch${b.number != null ? ` (${b.number})` : ""} to be executed on Ethereum. After that most ZKsync withdrawals are finalized automatically; if not, anyone can.`,
+    };
+  }
+
+  notes.push("Most ZKsync withdrawals are finalized automatically soon after their batch is executed. This one is still open, so anyone can finalize it.");
+  if (f.proof && !f.proof.simulated) {
+    notes.push("A dry run of this call on L1 (eth_call) did not succeed with the proof the L2 RPC returned. Fetch the proof again before sending it.");
+  }
+  return {
+    state: "READY_TO_FINALIZE", eta: null, who: "anyone", notes,
+    action: `L1Nullifier.finalizeDeposit({chainId: 324, l2BatchNumber: ${w.batch}, l2MessageIndex: ${w.index}, l2Sender: ${w.sender}, l2TxNumberInBatch: ${w.txNumberInBatch}, message: ${w.message}, merkleProof: ${f.proof ? `${f.proof.hashes.length} hashes` : "from zks_getL2ToL1LogProof"}})`,
+    summary: "Its batch is executed on L1 and it is ready to finalize. Anyone can send the finalize transaction; the funds go only to the withdrawal's recipient.",
   };
 }
