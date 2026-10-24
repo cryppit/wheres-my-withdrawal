@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Where's My Withdrawal</title>
-<meta name="description" content="Paste an OP Mainnet, Base or Arbitrum One withdrawal: see what step is missing, when it opens and who can do it. Read-only, no keys.">
+<meta name="description" content="Paste an OP Mainnet, Base, Arbitrum One, Linea or ZKsync Era withdrawal: see what step is missing, when it opens and who can do it. Read-only, no keys.">
 <style>
   :root {
     --bg: #070b22; --deep: #04061a; --panel: #0c1236; --line: rgba(154, 163, 199, 0.2);
@@ -51,11 +51,11 @@
 <main>
   <p class="kicker">Cryppit · read-only · no keys</p>
   <h1>Where's My Withdrawal</h1>
-  <p class="lead">Paste the OP Mainnet, Base or Arbitrum One transaction that started your withdrawal to Ethereum. See whether it is done, what step is missing, when it opens, and who can do it.</p>
+  <p class="lead">Paste the OP Mainnet, Base, Arbitrum One, Linea or ZKsync Era transaction that started your withdrawal to Ethereum. See whether it is done, what step is missing, when it opens, and who can do it.</p>
 
   <form id="f">
     <input id="tx" name="tx" placeholder="0x… L2 transaction hash" autocomplete="off" spellcheck="false" aria-label="L2 transaction hash">
-    <select id="chain" aria-label="Chain"><option value="auto">Find chain</option><option value="op">OP Mainnet</option><option value="base">Base</option><option value="arb">Arbitrum One</option></select>
+    <select id="chain" aria-label="Chain"><option value="auto">Find chain</option><option value="op">OP Mainnet</option><option value="base">Base</option><option value="arb">Arbitrum One</option><option value="linea">Linea</option><option value="zksync">ZKsync Era</option></select>
     <button class="go" id="go" type="submit">Check</button>
   </form>
   <div class="samples">Try:
@@ -63,25 +63,28 @@
     <button type="button" data-tx="0xafb31a144d76abfe507df920dc222f2675a562839d8639e9cbace056ab598430">Proven by a third party</button>
     <button type="button" data-tx="0x95e78c5563149643456198b291f78f6bcfa78488268f440ab88e3dfc59bcb46d">A Base withdrawal</button>
     <button type="button" data-tx="0xb1eece7b4253c1f04bf25bf469a8def4dec6c74d61b7f912470f3d40d06361c1">Arbitrum, claimed by a third party</button>
+    <button type="button" data-tx="0x6ee41de9db9157560a67fb52a8047776dd225a4cc3782cb7c9fba27830bc5b88">Linea, unclaimed since 2024</button>
+    <button type="button" data-tx="0x22582717367f72b59a9d7ffc7a326ccc882833fb7f232dc3d83699dc8a02e441">ZKsync, finalized by a third party</button>
   </div>
 
   <div id="out" aria-live="polite"></div>
 
   <section class="about">
-    <p><strong>Anyone can finish a withdrawal.</strong> On OP Mainnet and Base, proving and finalizing are open to any address; on Arbitrum One, so is the claim from the Outbox. The money only ever goes to the withdrawal's recipient.</p>
+    <p><strong>Anyone can finish a withdrawal.</strong> On OP Mainnet and Base, proving and finalizing are open to any address; on Arbitrum One and Linea, so is the claim; on ZKsync Era, so is the finalize step, which ZKsync's own finalizer usually takes for you. The money only ever goes to the withdrawal's recipient.</p>
     <p><strong>Someone else may already have.</strong> Some services now prove and finish old withdrawals for others and then ask the owner for a tip. You owe nothing: the funds reach the recipient either way.</p>
     <p><strong>How it reads.</strong> Your browser asks public RPCs directly, at the latest finalized Ethereum block. No wallet, no keys, nothing signed. <a href="https://github.com/cryppit/wheres-my-withdrawal">Source</a>.</p>
   </section>
 </main>
 <script type="module">
   import { check } from "./src/check.js";
-  import { formatAmount, utc, whoIs, claimedWhen } from "./src/render.js";
+  import { formatAmount, utc, whoIs, claimedWhen, claimVerb, proofLine } from "./src/render.js";
 
   const $ = (id) => document.getElementById(id);
   const PILL = {
     FINALIZED: ["Done", "s-done"], RELAY_FAILED: ["Needs a replay", "s-bad"], READY_TO_FINALIZE: ["Ready to finalize", "s-ready"],
     WAITING_TO_FINALIZE: ["Waiting", "s-wait"], READY_TO_PROVE: ["Ready to prove", "s-ready"], WAITING_FOR_GAME: ["Waiting", "s-wait"],
     CLAIMED: ["Done", "s-done"], READY_TO_CLAIM: ["Ready to claim", "s-ready"], WAITING_FOR_CONFIRMATION: ["Waiting", "s-wait"],
+    WAITING_FOR_FINALIZATION: ["Waiting", "s-wait"], WAITING_FOR_BATCH: ["Waiting", "s-wait"],
   };
   const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
   const row = (dl, k, v, mono) => { dl.append(el("dt", null, k)); const d = el("dd", mono ? "mono" : null); typeof v === "string" ? (d.textContent = v) : d.append(v); dl.append(d); };
@@ -109,9 +112,9 @@
     if (v.who === "anyone") row(dl, "Who can do it", "Anyone. The money only goes to the recipient.");
     if (f.asset.to) row(dl, "Recipient", f.asset.to, true);
     if (v.proof) row(dl, "Proven", `${utc(v.proof.provenAt)} by ${whoIs(v.proof.submitter, f)}`);
-    if (v.claim) row(dl, "Claimed", `${claimedWhen(v.claim)} by ${whoIs(v.claim.by, f)}`);
+    if (v.claim) row(dl, claimVerb(v), `${claimedWhen(v.claim)} by ${whoIs(v.claim.by, f)}`);
     if (v.action) row(dl, "The call", v.action, true);
-    if (v.action && f.proof) row(dl, "Proof", `${f.proof.hashes.length} hashes to root ${f.proof.root}${f.proof.rootConfirmed ? ", which the Outbox has confirmed" : ""}: ${f.proof.hashes.join(" ")}`, true);
+    if (v.action && f.proof) row(dl, "Proof", `${proofLine(f)}: ${f.proof.hashes.join(" ")}`, true);
     row(dl, "Started", `${utc(f.l2.timestamp)}, L2 block ${f.l2.blockNumber}`);
     row(dl, "Transaction", link(chain.explorer + f.l2.txHash, f.l2.txHash));
     card.append(dl);
