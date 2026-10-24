@@ -54,7 +54,12 @@ export function assetOf(w) {
 
 const message = (w) => ({ kind: "message", amount: w.value, from: w.sender, to: w.target });
 
-export async function readFacts(chain, txHash, { l1, l2 }, { index = 0 } = {}) {
+/**
+ * `clients.l1Archive` serves old state and wide log ranges (MEV Blocker, Tenderly); it defaults to `l1`.
+ * With `deferClaim`, a spent withdrawal comes back with claimLookup "pending" and no history search: claimOf() fills
+ * in the claimer afterwards, so the page can show the verdict first.
+ */
+export async function readFacts(chain, txHash, { l1, l2, l1Archive = l1 }, { index = 0, deferClaim = false } = {}) {
   const receipt = await l2("eth_getTransactionReceipt", [txHash]);
   if (!receipt) return { error: "not-found", message: `No ${chain.name} transaction with this hash.` };
   const all = withdrawalsIn(receipt);
@@ -75,16 +80,22 @@ export async function readFacts(chain, txHash, { l1, l2 }, { index = 0 } = {}) {
     return r && r.reverted ? null : r;
   };
 
+  // Every read that does not depend on another goes out together: each round trip to a public RPC costs ~300 ms.
   const rollup = chain.rollup;
-  const outbox = addressAt(await view(rollup, "outbox()"), 0);
-  const [spentHex, latestHex, periodHex, openHex] = await Promise.all([
-    view(outbox, "isSpent(uint256)", [BigInt(w.position)]),
+  const [outboxHex, latestHex, periodHex, openHex, asset] = await Promise.all([
+    view(rollup, "outbox()"),
     view(rollup, "latestConfirmed()"),
     view(rollup, "confirmPeriodBlocks()"),
     view(rollup, "validatorWhitelistDisabled()"),
+    checkedAsset(w, chain, view),
   ]);
+  const outbox = addressAt(outboxHex, 0);
+  const latest = "0x" + wordAt(latestHex, 0);
+  // Started now, needed only if the withdrawal is not spent; a spent one never waits on it.
+  const confirmedHash = confirmedBlockHash(latest, rollup, finBlock, l1, l1Archive, view);
+  confirmedHash.catch(() => {});
+  const spentHex = await view(outbox, "isSpent(uint256)", [BigInt(w.position)]);
 
-  const asset = await checkedAsset(w, chain, view);
   const facts = {
     chain: chain.id,
     stack: "arbitrum",
@@ -104,19 +115,13 @@ export async function readFacts(chain, txHash, { l1, l2 }, { index = 0 } = {}) {
   };
 
   if (facts.spent) {
-    try {
-      facts.claim = await findClaim(w, outbox, facts.config.confirmPeriodBlocks, finBlock, l1, view);
-      if (!facts.claim) facts.claimLookup = "not-found";
-    } catch {
-      facts.claimLookup = "failed"; // no archive state or logs from the free endpoints; the verdict says so
-    }
+    if (deferClaim) facts.claimLookup = "pending";
+    else Object.assign(facts, await claimOf(facts, { l1, l1Archive }));
     return facts;
   }
 
   // The latest confirmed assertion and the sendCount of its L2 block.
-  const latest = "0x" + wordAt(latestHex, 0);
-  const blockHash = await confirmedBlockHash(latest, rollup, finBlock, l1, view);
-  const l2Block = await l2("eth_getBlockByHash", [blockHash, false]);
+  const l2Block = await l2("eth_getBlockByHash", [await confirmedHash, false]);
   const sendCount = num(l2Block.sendCount);
   facts.confirmed = { assertion: latest, l2Block: num(l2Block.number), sendCount, covered: sendCount > w.position };
 
@@ -124,8 +129,22 @@ export async function readFacts(chain, txHash, { l1, l2 }, { index = 0 } = {}) {
     facts.proof = await outboxProof(w, sendCount, outbox, l2, view);
     return facts;
   }
-  facts.covering = await coveringAssertion(w, rollup, finBlock, l1, l2);
+  facts.covering = await coveringAssertion(w, rollup, finBlock, l1, l1Archive, l2);
   return facts;
+}
+
+/**
+ * Who sent the claim of a spent withdrawal: { claim, claimLookup }. claimLookup is null when found, "not-found" when
+ * the search ended without the log, "failed" when no endpoint served the history. It never guesses.
+ */
+export async function claimOf(facts, { l1, l1Archive = l1 }) {
+  const w = facts.withdrawal;
+  try {
+    const claim = await findClaim(w, facts.contracts.outbox, w.ethBlockNum + facts.config.confirmPeriodBlocks, facts.l1.block, l1Archive);
+    return { claim, claimLookup: claim ? null : "not-found" };
+  } catch {
+    return { claim: null, claimLookup: "failed" }; // no archive state or logs from the free endpoints; the verdict says so
+  }
 }
 
 /** Keep the ERC-20 label only for a real gateway: the router must map the token to it, and its L2 counterpart must be the sender. */
@@ -148,31 +167,38 @@ async function checkedAsset(w, chain, view) {
  * hourly), so a short window stays inside PublicNode's free log range. If confirmations have stalled, fall back to the
  * AssertionCreated log at the assertion's creation block, about 6.4 days back, which needs an archive endpoint.
  */
-async function confirmedBlockHash(assertion, rollup, finBlock, l1, view) {
+async function confirmedBlockHash(assertion, rollup, finBlock, l1, archive, view) {
   const recent = await l1("eth_getLogs", [{ address: rollup, fromBlock: hex(finBlock - 1799), toBlock: hex(finBlock), topics: [ASSERTION_CONFIRMED, assertion] }]);
   if (recent.length) return "0x" + wordAt(recent[recent.length - 1].data, 0);
   const node = await view(rollup, "getAssertion(bytes32)", [assertion]);
   const created = hex(uintAt(node, 2)); // AssertionNode: firstChildBlock, secondChildBlock, createdAtBlock, ...
-  const logs = await l1("eth_getLogs", [{ address: rollup, fromBlock: created, toBlock: created, topics: [ASSERTION_CREATED, assertion] }]);
+  const logs = await archive("eth_getLogs", [{ address: rollup, fromBlock: created, toBlock: created, topics: [ASSERTION_CREATED, assertion] }]);
   if (!logs.length) throw new Error(`AssertionCreated for ${assertion} not found`);
   return "0x" + wordAt(logs[0].data, 13);
 }
+
+// PublicNode's free tier serves logs from roughly the last 10,000 L1 blocks; older ranges go straight to an archive
+// endpoint instead of failing there first.
+const RECENT_BLOCKS = 8000;
 
 /**
  * The first assertion whose L2 block includes this withdrawal, and when its challenge window ends. The search starts
  * at the L1 block the withdrawal saw (no earlier assertion can include it) and widens until the finalized block.
  * Returns null when no assertion includes it yet. Rival assertions are not told apart: the first one wins here.
  */
-async function coveringAssertion(w, rollup, finBlock, l1, l2) {
+async function coveringAssertion(w, rollup, finBlock, l1, archive, l2) {
   let from = w.ethBlockNum;
   for (let size = 1000; from <= finBlock; size *= 2) {
     const to = Math.min(finBlock, from + size - 1);
-    const logs = await l1("eth_getLogs", [{ address: rollup, fromBlock: hex(from), toBlock: hex(to), topics: [ASSERTION_CREATED] }]);
-    for (const log of logs) {
-      const b = await l2("eth_getBlockByHash", ["0x" + wordAt(log.data, 13), false]);
-      if (b && num(b.sendCount) > w.position) {
-        const createdAtBlock = num(log.blockNumber);
-        return { assertion: log.topics[1], createdAtBlock, deadlineBlock: createdAtBlock + num("0x" + wordAt(log.data, 5)) };
+    const logs = await (from < finBlock - RECENT_BLOCKS ? archive : l1)("eth_getLogs", [{ address: rollup, fromBlock: hex(from), toBlock: hex(to), topics: [ASSERTION_CREATED] }]);
+    // About one assertion an hour: read their L2 blocks eight at a time (arb1 rate limits bursts), first in order wins.
+    for (let k = 0; k < logs.length; k += 8) {
+      const batch = logs.slice(k, k + 8);
+      const blocks = await Promise.all(batch.map((log) => l2("eth_getBlockByHash", ["0x" + wordAt(log.data, 13), false])));
+      const i = blocks.findIndex((b) => b && num(b.sendCount) > w.position);
+      if (i >= 0) {
+        const createdAtBlock = num(batch[i].blockNumber);
+        return { assertion: batch[i].topics[1], createdAtBlock, deadlineBlock: createdAtBlock + num("0x" + wordAt(batch[i].data, 5)) };
       }
     }
     from = to + 1;
@@ -195,28 +221,43 @@ async function outboxProof(w, size, outbox, l2, view) {
   return { size, leaf, root, hashes, leafMatches: leaf === w.hash, rootConfirmed: !!known && uintAt(known, 0) !== 0n };
 }
 
+// MEV Blocker answers eth_getLogs of any size up to this many blocks; about 1.4 days of L1, so even the standard
+// gateway (a few claims an hour share its `to` and `l2Sender` topics) returns a small page.
+const LOG_SPAN = 10_000;
+const PROBES = 15;
+
 /**
- * Who sent the claim. The Outbox keeps no record of it, so find the first L1 block where isSpent(position) is true
- * (a four-way search on historical state, which needs an archive endpoint), then read OutBoxTransactionExecuted in
- * that block and the transaction that emitted it. The claim cannot come before the withdrawal's L1 block plus one
- * confirm period.
+ * Who sent the claim. The Outbox keeps no record of it, but every claim emits OutBoxTransactionExecuted(to, l2Sender,
+ * 0, transactionIndex) with transactionIndex = position, and a position can be spent only once. The claim lies between
+ * the withdrawal's L1 block plus one confirm period (it cannot come sooner) and the finalized block. Most claims come
+ * right when the window opens, or recently from third parties finishing old withdrawals, so the first round reads
+ * the logs at both ends; meanwhile isSpent(position) on historical state at 15 points narrows the range 16-fold per
+ * round until it fits one log query. Both need an archive endpoint.
  */
-async function findClaim(w, outbox, confirmPeriodBlocks, finBlock, l1, view) {
-  const spentAt = async (b) => boolAt(await view(outbox, "isSpent(uint256)", [BigInt(w.position)], hex(b)), 0);
-  let lo = Math.min(w.ethBlockNum + confirmPeriodBlocks, finBlock);
-  let hi = finBlock; // spent here
-  while (lo < hi) {
-    const probes = [...new Set([1, 2, 3].map((i) => lo + Math.floor(((hi - lo) * i) / 4)))].filter((p) => p < hi);
-    const spent = await Promise.all(probes.map(spentAt));
+async function findClaim(w, outbox, earliest, finBlock, archive) {
+  const topics = [OUTBOX_EXECUTED, "0x" + word(w.target), "0x" + word(w.sender)];
+  const claimIn = async (from, to) => {
+    const logs = await archive("eth_getLogs", [{ address: outbox, fromBlock: hex(from), toBlock: hex(to), topics }]);
+    return logs.find((l) => uintAt(l.data, 0) === BigInt(w.position)) ?? null;
+  };
+  const spentAt = async (b) => boolAt(await archive("eth_call", [{ to: outbox, data: encodeCall("isSpent(uint256)", [BigInt(w.position)]) }, hex(b)]), 0);
+
+  let lo = Math.min(earliest, finBlock);
+  let hi = finBlock; // spent here; the claim's block is in [lo, hi]
+  let log = null;
+  for (let round = 0; !log && hi - lo + 1 > LOG_SPAN; round++) {
+    const probes = [...new Set(Array.from({ length: PROBES }, (_, i) => lo + Math.floor(((hi - lo) * (i + 1)) / (PROBES + 1))))].filter((p) => p < hi);
+    const ends = round === 0 ? [claimIn(lo, lo + LOG_SPAN - 1), claimIn(hi - LOG_SPAN + 1, hi)].map((p) => p.catch(() => null)) : [];
+    const [spent, found] = await Promise.all([Promise.all(probes.map(spentAt)), Promise.all(ends)]);
+    log = found.find(Boolean) ?? null;
     const first = spent.indexOf(true);
     if (first >= 0) {
       hi = probes[first];
       if (first > 0) lo = probes[first - 1] + 1;
     } else lo = probes[probes.length - 1] + 1;
   }
-  const logs = await l1("eth_getLogs", [{ address: outbox, fromBlock: hex(hi), toBlock: hex(hi), topics: [OUTBOX_EXECUTED, "0x" + word(w.target), "0x" + word(w.sender)] }]);
-  const log = logs.find((l) => uintAt(l.data, 0) === BigInt(w.position));
+  log ??= await claimIn(lo, hi);
   if (!log) return null;
-  const tx = await l1("eth_getTransactionByHash", [log.transactionHash]);
-  return { by: tx.from.toLowerCase(), txHash: log.transactionHash, block: hi, timestamp: log.blockTimestamp ? num(log.blockTimestamp) : null };
+  const tx = await archive("eth_getTransactionByHash", [log.transactionHash]);
+  return { by: tx.from.toLowerCase(), txHash: log.transactionHash, block: num(log.blockNumber), timestamp: log.blockTimestamp ? num(log.blockTimestamp) : null };
 }

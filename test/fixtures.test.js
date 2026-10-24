@@ -68,8 +68,8 @@ test("an ordinary OP transaction is not a withdrawal", async () => {
   assert.equal(r.error, "not-a-withdrawal");
 });
 
-// Arbitrum One, recorded on 24 Oct 2026 at finalized L1 block 26261887. The latest confirmed assertion then covered
-// sends up to position 167051.
+// Arbitrum One, recorded on 24 Oct 2026 at finalized L1 block 26261887 (the two claimed ones again at 26262206, when
+// the claimer search changed). The latest confirmed assertion then covered sends up to position 167051.
 
 test("Arbitrum, Feb 2023, 0.1 ETH claimed by unlost.eth on 23 Oct: done, and the claimer is named", async () => {
   const r = await replay("arb-claimed-by-unlost");
@@ -143,6 +143,51 @@ test("auto-detection finds an Arbitrum withdrawal after OP Mainnet and Base say 
   const r = await check(fx.tx, { clients: (c) => (c.id === "arb" ? { l1: replaying(fx.store.l1), l2: replaying(fx.store.l2) } : nowhere) });
   assert.equal(r.chain.id, "arb");
   assert.equal(r.verdict.state, "READY_TO_CLAIM");
+});
+
+test("auto-detection asks every chain at once: a chain whose RPC never answers does not hold up the others", { timeout: 5000 }, async () => {
+  const fx = load("arb-ready-eth");
+  const hang = { l1: () => new Promise(() => {}), l2: () => new Promise(() => {}) };
+  const r = await check(fx.tx, { clients: (c) => (c.id === "arb" ? { l1: replaying(fx.store.l1), l2: replaying(fx.store.l2) } : hang) });
+  assert.equal(r.chain.id, "arb");
+  assert.equal(r.verdict.state, "READY_TO_CLAIM");
+});
+
+test("auto-detection: a chain whose RPCs fail does not hide a withdrawal found on another", async () => {
+  const fx = load("arb-ready-eth");
+  const down = { l1: async () => { throw new Error("down"); }, l2: async () => { throw new Error("down"); } };
+  const r = await check(fx.tx, { clients: (c) => (c.id === "arb" ? { l1: replaying(fx.store.l1), l2: replaying(fx.store.l2) } : down) });
+  assert.equal(r.chain.id, "arb");
+});
+
+test("auto-detection: no chain has it, or the only answers are failures", async () => {
+  const tx = "0x" + "ab".repeat(32);
+  const nowhere = { l1: async () => null, l2: async () => null };
+  assert.equal((await check(tx, { clients: () => nowhere })).error, "not-found");
+  const down = { l1: async () => { throw new Error("down"); }, l2: async () => { throw new Error("down"); } };
+  await assert.rejects(check(tx, { clients: (c) => (c.id === "op" ? down : nowhere) }), /down/);
+});
+
+test("with deferExtras the verdict comes first and does not wait on the archive search for the claimer", { timeout: 5000 }, async () => {
+  const fx = load("arb-claimed-by-unlost");
+  let release;
+  const gate = new Promise((ok) => (release = ok));
+  const slow = async (m, p) => { await gate; return replaying(fx.store.l1)(m, p); };
+  const r = await check(fx.tx, { chain: "arb", deferExtras: true, clients: () => ({ l1: replaying(fx.store.l1), l2: replaying(fx.store.l2), l1Archive: slow }) });
+  assert.equal(r.verdict.state, "CLAIMED");
+  assert.equal(r.facts.claimLookup, "pending");
+  assert.equal(r.verdict.claim, null);
+  release();
+  const full = await r.extras;
+  assert.equal(full.verdict.claim.by, "0xa77028cd034fae57dd4acb50ebcb9c074d569e64");
+  assert.equal(full.facts.claimLookup, null);
+  assert.match(renderText(full), /unlost\.eth/);
+});
+
+test("without deferExtras (the CLI) everything is read before the answer, and there is nothing left over", async () => {
+  const r = await replay("arb-claimed-by-unlost");
+  assert.equal(r.extras, undefined);
+  assert.equal(r.verdict.claim.by, "0xa77028cd034fae57dd4acb50ebcb9c074d569e64");
 });
 
 test("a malformed hash is refused before any network call", async () => {

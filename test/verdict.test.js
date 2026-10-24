@@ -1,6 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { verdict } from "../src/verdict.js";
+import { claimLine } from "../src/render.js";
 
 const DAY = 86400;
 const T = 1_792_800_000; // the finalized L1 block's timestamp the reads are pinned to
@@ -169,6 +170,23 @@ test("Arbitrum: spent, claimer not found with free RPCs: done, and it says so", 
   assert.equal(v.state, "CLAIMED");
   assert.equal(v.claim, null);
   assert.ok(v.notes.some((n) => /who sent the claim/.test(n)));
+});
+
+test("Arbitrum: spent, claimer still being looked up: done now, and no 'could not find' yet", () => {
+  const v = verdict(arb({ spent: true, claim: null, claimLookup: "pending" }));
+  assert.equal(v.state, "CLAIMED");
+  assert.equal(v.claim, null);
+  assert.equal(v.notes.length, 0);
+});
+
+test("the claimer line: pending, found, or could not tell", () => {
+  const f = arb({ spent: true });
+  assert.equal(claimLine({ claim: null }, { ...f, claimLookup: "pending" }), "Finding who claimed it…");
+  assert.match(claimLine({ claim: null }, { ...f, claimLookup: "failed" }), /^Could not tell/);
+  assert.match(claimLine({ claim: null }, { ...f, claimLookup: "not-found" }), /^Could not tell/);
+  const claim = { by: "0xa77028cd034fae57dd4acb50ebcb9c074d569e64", block: BLOCK - 10, timestamp: T - 120 };
+  assert.match(claimLine({ claim }, f), /UTC by 0xa77028cd034fae57dd4acb50ebcb9c074d569e64 \(unlost\.eth/);
+  assert.equal(claimLine({ claim: null }, { ...f, spent: false }), null);
 });
 
 test("Arbitrum: ready, but the L2 RPC's proof does not check out on L1: still ready, with a warning", () => {

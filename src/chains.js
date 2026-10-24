@@ -6,6 +6,10 @@
 // Public RPCs only, no keys. Each list is tried in order. dRPC and 1RPC are never used.
 
 const L1_RPCS = ["https://ethereum-rpc.publicnode.com", "https://rpc.mevblocker.io"];
+// For old state and old logs, which PublicNode's free tier refuses ("archive requests require a personal token").
+// Both served eth_call at 2023 blocks and eth_getLogs over millions of blocks, with CORS, keyless (24 Oct 2026).
+// Tenderly's public gateway rate limits bursts, so it is only the fallback.
+const L1_ARCHIVE_RPCS = ["https://rpc.mevblocker.io", "https://gateway.tenderly.co/public/mainnet"];
 
 export const CHAINS = {
   op: {
@@ -45,6 +49,7 @@ export const CHAINS = {
     // headers); Nodies works from the CLI only. PublicNode's Arbitrum endpoint refuses receipts older than a few hours.
     l2Rpcs: ["https://arb1.arbitrum.io/rpc", "https://arbitrum-one.public.blastapi.io", "https://arb-pokt.nodies.app"],
     l1Rpcs: L1_RPCS,
+    l1ArchiveRpcs: L1_ARCHIVE_RPCS,
     rollup: "0x4dceb440657f21083db8add07665f8ddbe1dcfc0",
     l1GatewayRouter: "0x72ce9c846789fdb6fc1f34ac4ad25dd9ef7031ef",
     // About one assertion an hour (20 AssertionCreated logs in 6,000 L1 blocks, measured 24 Oct 2026).

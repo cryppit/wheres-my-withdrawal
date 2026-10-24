@@ -41,6 +41,15 @@ export function whoIs(address, f) {
 /** When a claim happened: its time if the RPC gave the block timestamp, otherwise its L1 block. */
 export const claimedWhen = (c) => (c.timestamp ? utc(c.timestamp) : `in L1 block ${c.block}`);
 
+/** The "claimed" line for a spent Arbitrum withdrawal: who and when, still looking, or could not tell. null otherwise. */
+export function claimLine(v, f) {
+  if (!f.spent) return null;
+  if (v.claim) return `${claimedWhen(v.claim)} by ${whoIs(v.claim.by, f)}`;
+  if (f.claimLookup === "pending") return "Finding who claimed it…";
+  if (f.claimLookup === "not-found") return "Could not tell: the claim's log was not in the range the RPCs returned.";
+  return "Could not tell: finding it needs Ethereum history that no free RPC served.";
+}
+
 export function renderText(r) {
   if (r.error) return r.message;
   const { chain, facts: f, verdict: v } = r;

@@ -15,7 +15,10 @@ if (!name || !CHAINS[chain] || !tx) {
 const store = { l1: {}, l2: {} };
 const clients = (c) => {
   const live = clientsFor(c);
-  return { l1: recording(live.l1, store.l1), l2: recording(live.l2, store.l2) };
+  // Archive reads share the L1 store: replays key on method and params, not on which endpoint answered.
+  const rec = { l1: recording(live.l1, store.l1), l2: recording(live.l2, store.l2) };
+  if (live.l1Archive) rec.l1Archive = recording(live.l1Archive, store.l1);
+  return rec;
 };
 const r = await check(tx, { chain, index: Number(index), clients });
 writeFileSync(new URL(`../fixtures/${name}.json`, import.meta.url), JSON.stringify({ chain, tx, index: Number(index), recordedAt: new Date().toISOString(), store }, null, 1) + "\n");

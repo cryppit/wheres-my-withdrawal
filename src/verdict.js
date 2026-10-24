@@ -99,7 +99,8 @@ function arbitrumVerdict(f) {
     if (claim && !sameAddress(claim.by, f.asset.to) && !sameAddress(claim.by, f.asset.from)) {
       notes.push("Someone other than the sender or the recipient sent the claim. The Outbox paid the recipient regardless; nothing is owed to whoever sent it.");
     }
-    if (!claim && f.claimLookup) notes.push("Could not find who sent the claim: that needs historical state the free RPCs did not serve.");
+    // "pending" means the page is still looking (check() with deferExtras); it fills in the claimer when done.
+    if (!claim && f.claimLookup && f.claimLookup !== "pending") notes.push("Could not find who sent the claim: that needs historical state the free RPCs did not serve.");
     return {
       state: "CLAIMED", eta: null, who: null, action: null, notes, claim,
       summary: "Claimed on L1. The funds went to the recipient; nothing is left to do.",
