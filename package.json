@@ -1,0 +1,13 @@
+{
+  "name": "wheres-my-withdrawal",
+  "version": "0.1.0",
+  "description": "Paste a rollup withdrawal, see what step is missing and who can do it. Read-only, keyless.",
+  "type": "module",
+  "license": "MIT",
+  "bin": { "wmw": "./cli.js" },
+  "engines": { "node": ">=22" },
+  "scripts": {
+    "test": "node --test test/",
+    "check": "node cli.js"
+  }
+}
