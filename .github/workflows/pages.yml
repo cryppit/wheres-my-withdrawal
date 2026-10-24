@@ -18,7 +18,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - run: node --test test/
+      - run: node --test 'test/*.test.js'
       - run: mkdir _site && cp -r index.html src _site/
       - uses: actions/upload-pages-artifact@v3
         with:

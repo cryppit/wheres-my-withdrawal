@@ -7,7 +7,7 @@
   "bin": { "wmw": "./cli.js" },
   "engines": { "node": ">=22" },
   "scripts": {
-    "test": "node --test test/",
+    "test": "node --test \"test/*.test.js\"",
     "check": "node cli.js"
   }
 }
