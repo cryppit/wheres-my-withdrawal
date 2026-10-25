@@ -58,6 +58,13 @@
   .step.not_reached b, .step.not_reached small { color: #7b82a8; }
   .step:has(+ .not_reached) .bar, .step:has(+ .waiting) .bar, .step:has(+ .next) .bar, .step:has(+ .stopped) .bar { background: repeating-linear-gradient(90deg, #6b7299 0 4px, transparent 4px 9px); }
   .step:has(+ .waiting) .bar, .step:has(+ .next) .bar { background: linear-gradient(90deg, var(--lime), var(--lime) 50%, transparent 50%), repeating-linear-gradient(90deg, #6b7299 0 4px, transparent 4px 9px); }
+  .step .dot { background: radial-gradient(circle at 50% 40%, rgba(221, 242, 74, 0.16), #04061a 72%); box-shadow: inset 0 0 0 2px var(--lime), 0 0 0 4px rgba(221, 242, 74, 0.12), 0 0 22px rgba(221, 242, 74, 0.35); }
+  .step .logo { width: 22px; height: 22px; filter: drop-shadow(0 0 5px rgba(255, 255, 255, 0.45)) drop-shadow(0 0 10px rgba(221, 242, 74, 0.5)); }
+  .step .badge { position: absolute; right: -5px; bottom: -5px; width: 18px; height: 18px; border-radius: 50%; display: grid; place-items: center; font: 700 10px/1 var(--mono); background: var(--lime); color: #04061a; box-shadow: 0 0 0 2px var(--panel); }
+  .step .badge:empty { display: none; }
+  .step.next .badge { background: var(--amber); } .step.waiting .badge { background: var(--blue); } .step.stopped .badge { background: var(--red); color: #fff; }
+  .step.next .dot, .step.waiting .dot, .step.not_reached .dot { background: #04061a; }
+  .step.not_reached .logo { filter: grayscale(1); opacity: 0.4; }
   @media (max-width: 560px) { .step b { font-size: 12.5px; } .step .dot { width: 34px; height: 34px; } .step .bar { top: 16px; left: calc(50% + 22px); width: calc(100% - 44px); } }
   .about { margin-top: 48px; color: var(--mute); font-size: 15px; display: grid; gap: 10px; }
   .about strong { color: var(--ink); }
@@ -120,16 +127,22 @@
   const WORD = { done: "Done", next: "Anyone, now", waiting: "Waiting", stopped: "Failed", not_reached: "Not yet" };
 
   /** The withdrawal's stops, left to right; the page plays them in when a check is new. */
-  function stepper(stack, v) {
+  // Chain logos (web3icons, MIT: logos/LICENSE): the first stop is on the L2, every later one on Ethereum.
+  function stepper(stack, v, l2, l2Name) {
     const steps = stepsOf(stack, v);
     const ol = el("ol", "steps");
     ol.style.setProperty("--n", steps.length);
     ol.setAttribute("aria-label", steps.map((s) => `${s.title}: ${WORD[s.state]}`).join(". "));
     steps.forEach((s, i) => {
       const li = el("li", `step ${s.state}`);
-      const dot = el("span", "dot", MARK[s.state]);
+      const dot = el("span", "dot");
       dot.setAttribute("aria-hidden", "true");
-      li.append(dot, el("b", null, s.title), el("small", null, s.state === "waiting" && s.eta ? left(s.eta) : WORD[s.state]));
+      const logo = el("img", "logo");
+      logo.src = `logos/${i === 0 ? l2 : "eth"}.svg`;
+      logo.alt = "";
+      logo.width = logo.height = 22;
+      dot.append(logo, el("span", "badge", MARK[s.state]));
+      li.append(dot, el("b", null, i === 0 ? `Started on ${l2Name}` : s.title), el("small", null, s.state === "waiting" && s.eta ? left(s.eta) : WORD[s.state]));
       if (i < steps.length - 1) li.append(el("span", "bar"));
       ol.append(li);
     });
@@ -158,7 +171,7 @@
     const [label, cls] = PILL[v.state];
     const head = el("header");
     head.append(el("span", `pill ${cls}`, label), el("span", null, `${chain.name} · ${formatAmount(f.asset)}`));
-    const steps = stepper(chain.stack, v);
+    const steps = stepper(chain.stack, v, chain.id, chain.name);
     card.append(head, steps, el("p", "summary", v.summary));
     const dl = el("dl");
     if (v.eta) { const e = el("span", "eta", left(v.eta)); const w = el("span"); w.append(e, el("span", null, `  ${utc(v.eta)}`)); row(dl, "Next step opens", w); }
