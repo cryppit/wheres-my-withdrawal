@@ -22,6 +22,12 @@
   .kicker { font: 600 13px/1 var(--mono); letter-spacing: 0.18em; text-transform: uppercase; color: var(--mute); margin: 0 0 12px; }
   h1 { font-size: clamp(30px, 6vw, 46px); line-height: 1.1; margin: 0 0 12px; text-wrap: balance; }
   .lead { color: var(--mute); max-width: 680px; margin: 0 0 24px; }
+  .rollups { list-style: none; display: flex; flex-wrap: wrap; gap: 10px; margin: 0 0 22px; padding: 0; }
+  .rollups li { display: inline-flex; align-items: center; gap: 8px; padding: 6px 14px 6px 6px; border-radius: 999px; border: 1px solid var(--line); background: rgba(12, 18, 54, 0.75); font-size: 14px; }
+  .rollups img { width: 26px; height: 26px; filter: drop-shadow(0 0 6px rgba(255, 255, 255, 0.35)) drop-shadow(0 0 10px rgba(221, 242, 74, 0.3)); }
+  img[src$="linea.svg"], img[src$="zksync.svg"] { background: #f3efe4; border-radius: 50%; padding: 3px; box-sizing: border-box; }
+  .rollups .to-eth { border-color: rgba(221, 242, 74, 0.45); padding-left: 12px; }
+  .rollups .to-eth span { color: var(--lime); }
   form { display: flex; gap: 10px; flex-wrap: wrap; }
   input { flex: 1 1 420px; min-width: 0; background: var(--panel); color: var(--ink); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; font: 15px var(--mono); }
   input:focus-visible, button:focus-visible, select:focus-visible { outline: 2px solid var(--lime); outline-offset: 2px; }
@@ -79,6 +85,15 @@
   <p class="kicker">Cryppit · read-only · no keys</p>
   <h1>Where's My Withdrawal</h1>
   <p class="lead">Paste the OP Mainnet, Base, Arbitrum One, Linea or ZKsync Era transaction that started your withdrawal to Ethereum. See whether it is done, what step is missing, when it opens, and who can do it.</p>
+
+  <ul class="rollups" aria-label="The rollups it reads">
+    <li><img src="logos/op.svg" alt="" width="26" height="26">OP Mainnet</li>
+    <li><img src="logos/base.svg" alt="" width="26" height="26">Base</li>
+    <li><img src="logos/arb.svg" alt="" width="26" height="26">Arbitrum One</li>
+    <li><img src="logos/linea.svg" alt="" width="26" height="26">Linea</li>
+    <li><img src="logos/zksync.svg" alt="" width="26" height="26">ZKsync Era</li>
+    <li class="to-eth"><span aria-hidden="true">→</span><img src="logos/eth.svg" alt="" width="26" height="26">Ethereum</li>
+  </ul>
 
   <form id="f">
     <input id="tx" name="tx" placeholder="0x… L2 transaction hash" autocomplete="off" spellcheck="false" aria-label="L2 transaction hash">
