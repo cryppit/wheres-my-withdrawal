@@ -42,6 +42,23 @@
   .note { border-left: 2px solid var(--amber); padding: 4px 0 4px 12px; color: var(--ink); margin: 14px 0 0; font-size: 15px; }
   .foot { color: var(--mute); font-size: 13.5px; margin-top: 16px; }
   .err { border-color: var(--red); }
+  .steps { list-style: none; margin: 4px 0 20px; padding: 0; display: grid; grid-template-columns: repeat(var(--n), minmax(0, 1fr)); }
+  .step { position: relative; display: flex; flex-direction: column; align-items: center; text-align: center; gap: 8px; min-width: 0; }
+  .step .dot { width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center; font: 700 16px/1 var(--mono); background: var(--lime); color: #04061a; box-shadow: 0 0 0 4px rgba(221, 242, 74, 0.14), 0 0 22px rgba(221, 242, 74, 0.35); position: relative; z-index: 1; }
+  .step b { font-size: 14px; line-height: 1.25; }
+  .step small { color: var(--mute); font: 600 11px/1.3 var(--mono); letter-spacing: 0.06em; text-transform: uppercase; }
+  .step .bar { position: absolute; top: 19px; left: calc(50% + 26px); width: calc(100% - 52px); height: 2px; background: var(--lime); transform-origin: 0 50%; }
+  .step.next .dot { background: transparent; color: var(--amber); box-shadow: inset 0 0 0 2px var(--amber), 0 0 20px rgba(255, 181, 71, 0.35); }
+  .step.next b, .step.next small { color: var(--amber); }
+  .step.waiting .dot { background: transparent; color: var(--blue); box-shadow: inset 0 0 0 2px var(--blue); }
+  .step.waiting b, .step.waiting small { color: var(--blue); }
+  .step.stopped .dot { background: rgba(255, 107, 107, 0.12); color: var(--red); box-shadow: inset 0 0 0 2px var(--red); }
+  .step.stopped b, .step.stopped small { color: var(--red); }
+  .step.not_reached .dot { background: transparent; color: #6b7299; box-shadow: inset 0 0 0 2px #6b7299; }
+  .step.not_reached b, .step.not_reached small { color: #7b82a8; }
+  .step:has(+ .not_reached) .bar, .step:has(+ .waiting) .bar, .step:has(+ .next) .bar, .step:has(+ .stopped) .bar { background: repeating-linear-gradient(90deg, #6b7299 0 4px, transparent 4px 9px); }
+  .step:has(+ .waiting) .bar, .step:has(+ .next) .bar { background: linear-gradient(90deg, var(--lime), var(--lime) 50%, transparent 50%), repeating-linear-gradient(90deg, #6b7299 0 4px, transparent 4px 9px); }
+  @media (max-width: 560px) { .step b { font-size: 12.5px; } .step .dot { width: 34px; height: 34px; } .step .bar { top: 16px; left: calc(50% + 22px); width: calc(100% - 44px); } }
   .about { margin-top: 48px; color: var(--mute); font-size: 15px; display: grid; gap: 10px; }
   .about strong { color: var(--ink); }
   @media (max-width: 560px) { dl { grid-template-columns: minmax(0, 1fr); gap: 2px 0; } dd { margin-bottom: 10px; } }
@@ -78,6 +95,7 @@
 <script type="module">
   import { check } from "./src/check.js";
   import { formatAmount, utc, whoIs, claimLine, claimVerb, proofLine } from "./src/render.js";
+  import { stepsOf } from "./src/steps.js";
 
   const $ = (id) => document.getElementById(id);
   const PILL = {
@@ -97,7 +115,41 @@
     return d ? `in ${d} d ${h} h` : h ? `in ${h} h ${m} min` : `in ${m} min`;
   }
 
-  function show(r) {
+
+  const MARK = { done: "✓", next: "→", waiting: "…", stopped: "!", not_reached: "" };
+  const WORD = { done: "Done", next: "Anyone, now", waiting: "Waiting", stopped: "Failed", not_reached: "Not yet" };
+
+  /** The withdrawal's stops, left to right; the page plays them in when a check is new. */
+  function stepper(stack, v) {
+    const steps = stepsOf(stack, v);
+    const ol = el("ol", "steps");
+    ol.style.setProperty("--n", steps.length);
+    ol.setAttribute("aria-label", steps.map((s) => `${s.title}: ${WORD[s.state]}`).join(". "));
+    steps.forEach((s, i) => {
+      const li = el("li", `step ${s.state}`);
+      const dot = el("span", "dot", MARK[s.state]);
+      dot.setAttribute("aria-hidden", "true");
+      li.append(dot, el("b", null, s.title), el("small", null, s.state === "waiting" && s.eta ? left(s.eta) : WORD[s.state]));
+      if (i < steps.length - 1) li.append(el("span", "bar"));
+      ol.append(li);
+    });
+    return ol;
+  }
+
+  function play(ol) {
+    if (typeof ol.animate !== "function" || matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    let t = 0;
+    for (const li of ol.children) {
+      const dot = li.querySelector(".dot"), bar = li.querySelector(".bar");
+      dot.animate([{ opacity: 0.15, transform: "scale(0.6)" }, { opacity: 1, transform: "scale(1.15)", offset: 0.6 }, { opacity: 1, transform: "scale(1)" }], { duration: 380, delay: t, easing: "cubic-bezier(0.22, 1, 0.36, 1)", fill: "backwards" });
+      for (const x of li.querySelectorAll("b, small")) x.animate([{ opacity: 0.15 }, { opacity: 1 }], { duration: 300, delay: t + 80, fill: "backwards" });
+      if (li.classList.contains("next")) dot.animate([{ boxShadow: "0 0 0 0 rgba(255,181,71,0.6)" }, { boxShadow: "0 0 0 14px rgba(255,181,71,0)" }], { duration: 900, delay: t + 360, iterations: 3, easing: "ease-out" });
+      if (bar) bar.animate([{ transform: "scaleX(0)" }, { transform: "scaleX(1)" }], { duration: 360, delay: t + 220, easing: "ease-in-out", fill: "backwards" });
+      t += 460;
+    }
+  }
+
+  function show(r, animate = true) {
     const out = $("out");
     out.replaceChildren();
     const card = el("div", "card");
@@ -106,7 +158,8 @@
     const [label, cls] = PILL[v.state];
     const head = el("header");
     head.append(el("span", `pill ${cls}`, label), el("span", null, `${chain.name} · ${formatAmount(f.asset)}`));
-    card.append(head, el("p", "summary", v.summary));
+    const steps = stepper(chain.stack, v);
+    card.append(head, steps, el("p", "summary", v.summary));
     const dl = el("dl");
     if (v.eta) { const e = el("span", "eta", left(v.eta)); const w = el("span"); w.append(e, el("span", null, `  ${utc(v.eta)}`)); row(dl, "Next step opens", w); }
     if (v.who === "anyone") row(dl, "Who can do it", "Anyone. The money only goes to the recipient.");
@@ -122,6 +175,7 @@
     for (const n of v.notes) card.append(el("p", "note", n));
     card.append(el("p", "foot", `Read from public RPCs at finalized Ethereum block ${f.l1.block} (${utc(f.l1.timestamp)}). Nothing was signed.`));
     out.append(card);
+    if (animate) play(steps);
   }
 
   // The verdict shows as soon as it is known; slow extras (who sent an Arbitrum claim or a ZKsync finalize) fill in when they arrive,
@@ -135,7 +189,7 @@
     try {
       const r = await check(tx, { chain: $("chain").value, deferExtras: true });
       show(r);
-      r.extras?.then((full) => { if (me === runs) show(full); });
+      r.extras?.then((full) => { if (me === runs) show(full, false); });
     }
     catch (e) { show({ error: "rpc", message: `The public RPCs did not answer (${e.message}). Try again in a minute.` }); }
     finally { $("go").disabled = false; }
