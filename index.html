@@ -36,6 +36,13 @@
   .pill { font: 700 12px var(--mono); letter-spacing: 0.08em; text-transform: uppercase; border-radius: 999px; padding: 5px 11px; border: 1px solid; white-space: nowrap; }
   .s-done { color: var(--lime); } .s-ready { color: var(--amber); } .s-wait { color: var(--blue); } .s-bad { color: var(--red); }
   .summary { font-size: 18px; margin: 0 0 16px; }
+  .plain { margin: 4px 0 18px; padding: 16px 18px; border-radius: 14px; background: rgba(221, 242, 74, 0.06); border: 1px solid rgba(221, 242, 74, 0.35); }
+  .plain .eyebrow { color: var(--lime); }
+  .plain-head { font-size: 19px; font-weight: 700; margin: 6px 0 10px; }
+  .plain-steps { margin: 0; padding-left: 22px; display: grid; gap: 8px; font-size: 15.5px; color: #e6e8f2; }
+  details.dev { margin-top: 14px; border-top: 1px solid var(--line); padding-top: 10px; }
+  details.dev summary { cursor: pointer; color: var(--mute); font-size: 14px; }
+  details.dev dl { margin-top: 10px; }
   dl { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 8px 18px; margin: 0; }
   dt { color: var(--mute); font-size: 14px; }
   dd { margin: 0; font-size: 15px; overflow-wrap: anywhere; }
@@ -211,7 +218,7 @@
         <div><dt>6 rollups</dt><dd>to Ethereum</dd></div>
         <div><dt>0 keys</dt><dd>nothing to sign</dd></div>
         <div><dt>MIT</dt><dd>open source</dd></div>
-        <div><dt>104 tests</dt><dd>on recorded data</dd></div>
+        <div><dt>110 tests</dt><dd>on recorded data</dd></div>
       </dl>
     </div>
 
@@ -299,7 +306,7 @@
       <span class="fx fx-code" aria-hidden="true"></span>
       <h3>Read from Ethereum</h3>
       <p>Your browser asks public RPCs directly, pinned to the latest finalized Ethereum block, and every wait is read live from the contracts. No wallet, no keys, nothing signed, nothing stored.</p>
-      <p class="tags"><span>MIT</span><span>No keys</span><span>No server</span><span>104 tests</span></p>
+      <p class="tags"><span>MIT</span><span>No keys</span><span>No server</span><span>110 tests</span></p>
     </article>
   </section>
 
@@ -323,6 +330,7 @@
   import { check } from "./src/check.js";
   import { formatAmount, utc, whoIs, claimLine, claimVerb, proofLine } from "./src/render.js";
   import { stepsOf } from "./src/steps.js";
+  import { plainNext } from "./src/plain.js";
 
   const $ = (id) => document.getElementById(id);
   const PILL = {
@@ -392,7 +400,15 @@
     const head = el("header");
     head.append(el("span", `pill ${cls}`, label), el("span", null, `${chain.name} · ${formatAmount(f.asset)}`));
     const steps = stepper(chain.stack, v, chain.id, chain.name);
-    card.append(head, steps, el("p", "summary", v.summary));
+    card.append(head, steps);
+    // What it means, in plain words, before any technical detail.
+    const plain = plainNext(r);
+    const box = el("div", "plain");
+    box.append(el("p", "eyebrow", "What this means for you"), el("p", "plain-head", plain.headline));
+    const ol = el("ol", "plain-steps");
+    for (const s of plain.steps) ol.append(el("li", null, s));
+    box.append(ol);
+    card.append(box);
     const dl = el("dl");
     if (v.eta) { const e = el("span", "eta", left(v.eta)); const w = el("span"); w.append(e, el("span", null, `  ${utc(v.eta)}`)); row(dl, "Next step opens", w); }
     if (v.who === "anyone") row(dl, "Who can do it", "Anyone. The money only goes to the recipient.");
@@ -400,12 +416,18 @@
     if (v.proof) row(dl, "Proven", `${utc(v.proof.provenAt)} by ${whoIs(v.proof.submitter, f)}`);
     const claimed = claimLine(v, f);
     if (claimed) row(dl, claimVerb(v), claimed);
-    if (v.action) row(dl, "The call", v.action, true);
-    if (v.action && f.proof) row(dl, "Proof", `${proofLine(f)}: ${f.proof.hashes.join(" ")}`, true);
+    const dev = el("dl");
+    if (v.action) row(dev, "The call", v.action, true);
+    if (v.action && f.proof) row(dev, "Proof", `${proofLine(f)}: ${f.proof.hashes.join(" ")}`, true);
     row(dl, "Started", `${utc(f.l2.timestamp)}, L2 block ${f.l2.blockNumber}`);
     row(dl, "Transaction", link(chain.explorer + f.l2.txHash, f.l2.txHash));
     card.append(dl);
     for (const n of v.notes) card.append(el("p", "note", n));
+    if (dev.children.length) {
+      const d = el("details", "dev");
+      d.append(el("summary", null, "For developers: the exact call"), dev);
+      card.append(d);
+    }
     card.append(el("p", "foot", `Read from public RPCs at finalized Ethereum block ${f.l1.block} (${utc(f.l1.timestamp)}). Nothing was signed.`));
     out.append(card);
     if (animate) play(steps);

@@ -1,5 +1,6 @@
 // Plain-text report for the terminal. The page renders the same result object its own way.
 import { KNOWN } from "./chains.js";
+import { plainNext } from "./plain.js";
 
 const LABEL = {
   FINALIZED: "DONE",
@@ -74,6 +75,8 @@ export function renderText(r) {
     "",
     `${LABEL[v.state]}  ${v.summary}`,
   ];
+  const plain = plainNext(r);
+  lines.push("", "What this means for you:", `  ${plain.headline}`, ...plain.steps.map((st, i) => `  ${i + 1}. ${st}`), "", "Details:");
   if (v.proof) lines.push(`  proven ${utc(v.proof.provenAt)} by ${whoIs(v.proof.submitter, f)}`);
   if (v.claim) lines.push(`  ${claimVerb(v).toLowerCase()} ${claimedWhen(v.claim)} by ${whoIs(v.claim.by, f)}`);
   if (v.eta) lines.push(`  next step opens about ${utc(v.eta)}`);
