@@ -211,7 +211,7 @@
         <div><dt>6 rollups</dt><dd>to Ethereum</dd></div>
         <div><dt>0 keys</dt><dd>nothing to sign</dd></div>
         <div><dt>MIT</dt><dd>open source</dd></div>
-        <div><dt>98 tests</dt><dd>on recorded data</dd></div>
+        <div><dt>104 tests</dt><dd>on recorded data</dd></div>
       </dl>
     </div>
 
@@ -299,7 +299,7 @@
       <span class="fx fx-code" aria-hidden="true"></span>
       <h3>Read from Ethereum</h3>
       <p>Your browser asks public RPCs directly, pinned to the latest finalized Ethereum block, and every wait is read live from the contracts. No wallet, no keys, nothing signed, nothing stored.</p>
-      <p class="tags"><span>MIT</span><span>No keys</span><span>No server</span><span>98 tests</span></p>
+      <p class="tags"><span>MIT</span><span>No keys</span><span>No server</span><span>104 tests</span></p>
     </article>
   </section>
 
@@ -430,6 +430,15 @@
 
   $("f").addEventListener("submit", (e) => { e.preventDefault(); run(); });
   for (const b of document.querySelectorAll("button[data-tx]")) b.addEventListener("click", () => { $("tx").value = b.dataset.tx; $("chain").value = "auto"; run(); $("out").scrollIntoView({ behavior: "smooth", block: "start" }); });
+
+  // A link can carry the check: ?tx=0x… (and optionally &chain=op).
+  const q = new URLSearchParams(location.search);
+  if (/^0x[0-9a-fA-F]{64}$/.test(q.get("tx") ?? "")) {
+    $("tx").value = q.get("tx");
+    if (q.get("chain") && [...$("chain").options].some((o) => o.value === q.get("chain"))) $("chain").value = q.get("chain");
+    run();
+    $("out").scrollIntoView({ behavior: "smooth", block: "start" });
+  }
 
   // The real result beside "How a check works": the Arbitrum withdrawal claimed by a third party, played when it comes into view.
   const example = stepper("arbitrum", { state: "CLAIMED" }, "arb", "Arbitrum One");

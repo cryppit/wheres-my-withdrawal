@@ -32,6 +32,7 @@ export function verdict(f) {
   const t = f.l1.timestamp;
   const notes = [];
   if (f.feeVault) notes.push("This is a fee vault withdrawal: protocol revenue moving to L1, not a user's funds.");
+  if (f.legacy) notes.push("This withdrawal started before OP Mainnet's Bedrock upgrade (6 June 2023). The upgrade carried it over as a new-style withdrawal, which is why bridge apps don't list it. It is finished the same way as any other: prove, wait 7 days, finalize.");
   const tx = `(${f.withdrawal.hash})`;
 
   if (f.finalized) {

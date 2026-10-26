@@ -12,7 +12,7 @@ Paste the L2 transaction that started a withdrawal to Ethereum. It tells you, fr
 
 It never asks for keys, never connects a wallet and never signs anything.
 
-Supported now: **OP Mainnet**, **Base**, **Arbitrum One** (Nitro withdrawals, since 31 Aug 2022), **Robinhood Chain**
+Supported now: **OP Mainnet** (including withdrawals started before the Bedrock upgrade of 6 June 2023), **Base**, **Arbitrum One** (Nitro withdrawals, since 31 Aug 2022), **Robinhood Chain**
 (since its mainnet, 1 Jul 2026), **Linea** and **ZKsync Era** (withdrawals through the ZKsync bridge).
 
 ## Use it
@@ -55,6 +55,20 @@ For each OP Mainnet or Base withdrawal it reads, at the latest **finalized** Eth
 4. the newest dispute game, to tell whether the withdrawal can be proven yet.
 
 The anchor state registry and the dispute game factory are read from the portal each time, because upgrades move them.
+
+**Withdrawals started before Bedrock (OP Mainnet, before 6 June 2023).** These have no `MessagePassed` log, only the old
+messenger's `SentMessage`, so bridge apps don't list them. The upgrade carried every one over into the
+L2ToL1MessagePasser as a new-style withdrawal. The tool rebuilds it the way `op-chain-ops/crossdomain/migrate.go`
+(v1.1.4, `MigrateWithdrawal`) did:
+- the old nonce, kept as version 0;
+- sender = the L2 messenger, target = the L1 messenger;
+- value = the amount, only for an ETH withdrawal through the L2 standard bridge;
+- data = `relayMessage(nonce, old sender, old target, value, 0, old message)`;
+- gas limit = 16 per data byte + 1,300,873.
+
+It then checks that `sentMessages(hash)` is true on OP Mainnet. If the L1 messenger has the old message hash in
+`successfulMessages`, it was relayed (before or after the upgrade) and is done. Otherwise it is read like any other
+withdrawal (prove, wait, finalize). Example: a 0.01798 ETH withdrawal from 11 Dec 2022 (`fixtures/op-2022-pre-bedrock.json`).
 
 Anyone can finalize with anyone's valid proof: `finalizeWithdrawalTransactionExternalProof(tx, proofSubmitter)` has no
 caller check in the deployed portals.
