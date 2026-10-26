@@ -1,6 +1,7 @@
 // Chain profiles. Addresses are the L1 contracts each chain publishes (OP: superchain-registry op.toml; Base:
 // docs.base.org Base contracts, since Base left the registry on 2026-04-27; Arbitrum: docs.arbitrum.io useful
-// addresses, checked on chain on 2026-10-24: Bridge.rollup() and Outbox.rollup() both name this rollup; Linea:
+// addresses, checked on chain on 2026-10-24: Bridge.rollup() and Outbox.rollup() both name this rollup; Robinhood
+// Chain: docs.robinhood.com/chain/protocol-contracts, checked on chain on 2026-10-26 the same way; Linea:
 // docs.linea.build, checked on chain on 2026-10-24: each TokenBridge's messageService() and remoteSender() name the
 // others; ZKsync: zks_getBridgeContracts and zks_getMainContract, and L1AssetRouter.L1_NULLIFIER()). The anchor state
 // registry, the dispute game factory and the Arbitrum Outbox are read at run time, because upgrades move them.
@@ -57,6 +58,21 @@ export const CHAINS = {
     // About one assertion an hour (20 AssertionCreated logs in 6,000 L1 blocks, measured 24 Oct 2026).
     cadenceSec: 3600,
     explorer: "https://arbiscan.io/tx/",
+  },
+  robinhood: {
+    id: "robinhood",
+    name: "Robinhood Chain",
+    stack: "arbitrum",
+    l2ChainId: 4663,
+    // Robinhood's own endpoint is the only keyless one; it serves receipts, logs and NodeInterface proofs, with CORS.
+    l2Rpcs: ["https://rpc.mainnet.chain.robinhood.com"],
+    l1Rpcs: L1_RPCS,
+    l1ArchiveRpcs: L1_ARCHIVE_RPCS,
+    rollup: "0x23a19d23e89166adedbdcb432518ab01e4272d94",
+    l1GatewayRouter: "0x6a2e3a1e16fc29f27ce61429746d558d656975bb",
+    // About one assertion every 30 minutes (452 AssertionCreated logs in 72,000 L1 blocks, measured 26 Oct 2026).
+    cadenceSec: 1800,
+    explorer: "https://robinhoodchain.blockscout.com/tx/",
   },
   linea: {
     id: "linea",

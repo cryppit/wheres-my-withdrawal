@@ -131,7 +131,8 @@ function arbitrumVerdict(f) {
 
   const left = f.covering.deadlineBlock - f.l1.block;
   if (left <= 0) {
-    if (c.anyoneCanConfirm) notes.push("On Arbitrum One anyone may confirm the assertion (RollupUserLogic.confirmAssertion); validators normally do it within the hour.");
+    if (c.anyoneCanConfirm) notes.push("Anyone may confirm the assertion (RollupUserLogic.confirmAssertion); validators normally do it within the hour.");
+    else notes.push(`On this chain only the rollup's whitelisted validators may confirm the assertion (anyone may only once they have been idle for weeks); they post one about every ${Math.round(c.cadenceSec / 60)} minutes, so it normally comes soon.`);
     return {
       state: "WAITING_FOR_CONFIRMATION", eta: t, who: null, notes, action: null,
       summary: "The challenge window is over. The assertion that includes this withdrawal only waits to be confirmed; then anyone can claim it.",

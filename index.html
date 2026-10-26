@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Where's My Withdrawal</title>
-<meta name="description" content="Paste an OP Mainnet, Base, Arbitrum One, Linea or ZKsync Era withdrawal: see what step is missing, when it opens and who can do it. Read-only, no keys.">
+<meta name="description" content="Paste an OP Mainnet, Base, Arbitrum One, Robinhood Chain, Linea or ZKsync Era withdrawal: see what step is missing, when it opens and who can do it. Read-only, no keys.">
 <link rel="icon" href="icons/favicon-32.png" sizes="32x32" type="image/png">
 <link rel="icon" href="icons/favicon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
@@ -97,17 +97,17 @@
   .stats dd { margin: 2px 0 0; color: var(--mute); font-size: 13px; }
   @media (max-width: 560px) { .stats { grid-template-columns: repeat(2, minmax(0, 1fr)); row-gap: 16px; } .stats div:nth-child(3) { padding-left: 0; border-left: 0; } }
 
-  /* The art: the five rollups on the left, light routes climbing into a glowing Ethereum coin. */
+  /* The art: the six rollups on the left, light routes climbing into a glowing Ethereum coin. */
   .hero-art { position: relative; min-height: 430px; border-radius: 24px; overflow: hidden; background: radial-gradient(closest-side at 75% 50%, rgba(143, 180, 255, 0.25), transparent 70%), url(art/withdrawal.jpg) center / cover no-repeat; box-shadow: inset 0 0 0 1px rgba(143, 180, 255, 0.2), 0 40px 120px -50px rgba(42, 59, 214, 0.8); }
   .hero-art::after { content: ""; position: absolute; inset: 0; background: radial-gradient(120% 90% at 50% 50%, transparent 40%, var(--deep) 100%); pointer-events: none; }
   .lines { position: absolute; inset: 6% 6%; width: 88%; height: 88%; z-index: 1; overflow: visible; }
   .ln { fill: none; stroke: var(--lime); stroke-width: 2; vector-effect: non-scaling-stroke; stroke-dasharray: 6 9; animation: flow 1.4s linear infinite; filter: drop-shadow(0 0 5px rgba(221, 242, 74, 0.9)); opacity: 0.85; }
-  .ln:nth-child(2) { animation-duration: 1.7s; } .ln:nth-child(3) { animation-duration: 1.2s; } .ln:nth-child(4) { animation-duration: 1.9s; } .ln:nth-child(5) { animation-duration: 1.5s; }
+  .ln:nth-child(2) { animation-duration: 1.7s; } .ln:nth-child(3) { animation-duration: 1.2s; } .ln:nth-child(4) { animation-duration: 1.9s; } .ln:nth-child(5) { animation-duration: 1.5s; } .ln:nth-child(6) { animation-duration: 1.3s; }
   @keyframes flow { to { stroke-dashoffset: -30; } }
   .l2s { position: absolute; z-index: 2; left: 5%; top: 6%; bottom: 6%; margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; justify-content: space-between; }
   .l2s li { display: flex; align-items: center; gap: 8px; font: 700 12px system-ui, sans-serif; text-shadow: 0 2px 8px #000; }
   .l2s img { width: 52px; height: 52px; padding: 9px; border-radius: 50%; background: radial-gradient(circle at 35% 30%, #18204f, #070b22 70%); box-shadow: inset 0 0 0 2px rgba(221, 242, 74, 0.7), 0 0 22px rgba(221, 242, 74, 0.35); animation: bob 5s ease-in-out infinite; }
-  .l2s li:nth-child(2) img { animation-delay: -1s; } .l2s li:nth-child(3) img { animation-delay: -2s; } .l2s li:nth-child(4) img { animation-delay: -3s; } .l2s li:nth-child(5) img { animation-delay: -4s; }
+  .l2s li:nth-child(2) img { animation-delay: -1s; } .l2s li:nth-child(3) img { animation-delay: -2s; } .l2s li:nth-child(4) img { animation-delay: -3s; } .l2s li:nth-child(5) img { animation-delay: -4s; } .l2s li:nth-child(6) img { animation-delay: -2.5s; }
   .l2s img[src$="linea.svg"], .l2s img[src$="zksync.svg"] { background: radial-gradient(circle, #f3efe4 55%, #cfd3e8); padding: 9px; }
   @keyframes bob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-5px); } }
   .eth-coin { position: absolute; z-index: 3; right: 8%; top: 50%; transform: translateY(-50%); display: grid; justify-items: center; gap: 10px; font: 700 13px system-ui, sans-serif; text-shadow: 0 2px 10px #000; }
@@ -199,25 +199,27 @@
       <p class="lede">Paste the transaction that started your withdrawal from an L2 to Ethereum. See whether it is done, what step is missing, when it opens, and who can take it, read from Ethereum itself.</p>
       <p class="ctas"><a class="btn lime-btn" href="#check">Check a withdrawal →</a><a class="btn ghost-btn" href="https://github.com/cryppit/wheres-my-withdrawal" target="_blank" rel="noopener noreferrer">View on GitHub</a></p>
       <dl class="stats">
-        <div><dt>5 rollups</dt><dd>to Ethereum</dd></div>
+        <div><dt>6 rollups</dt><dd>to Ethereum</dd></div>
         <div><dt>0 keys</dt><dd>nothing to sign</dd></div>
         <div><dt>MIT</dt><dd>open source</dd></div>
-        <div><dt>93 tests</dt><dd>on recorded data</dd></div>
+        <div><dt>98 tests</dt><dd>on recorded data</dd></div>
       </dl>
     </div>
 
     <div class="hero-art" aria-hidden="true">
       <svg class="lines" viewBox="0 0 400 400" preserveAspectRatio="none">
         <path class="ln" d="M86 58 C 200 60, 220 180, 300 200"/>
-        <path class="ln" d="M86 129 C 190 130, 220 190, 300 200"/>
-        <path class="ln" d="M86 200 C 180 200, 220 200, 300 200"/>
-        <path class="ln" d="M86 271 C 190 270, 220 210, 300 200"/>
+        <path class="ln" d="M86 115 C 195 116, 220 188, 300 200"/>
+        <path class="ln" d="M86 172 C 185 172, 220 196, 300 200"/>
+        <path class="ln" d="M86 228 C 185 228, 220 204, 300 200"/>
+        <path class="ln" d="M86 285 C 195 284, 220 212, 300 200"/>
         <path class="ln" d="M86 342 C 200 340, 220 220, 300 200"/>
       </svg>
       <ul class="l2s">
         <li><img src="logos/op.svg" alt="" width="40" height="40"><span>OP</span></li>
         <li><img src="logos/base.svg" alt="" width="40" height="40"><span>Base</span></li>
         <li><img src="logos/arb.svg" alt="" width="40" height="40"><span>Arbitrum</span></li>
+        <li><img src="logos/robinhood.svg" alt="" width="40" height="40"><span>Robinhood</span></li>
         <li><img src="logos/linea.svg" alt="" width="40" height="40"><span>Linea</span></li>
         <li><img src="logos/zksync.svg" alt="" width="40" height="40"><span>ZKsync</span></li>
       </ul>
@@ -231,7 +233,7 @@
       <form id="f">
         <label for="tx">L2 transaction hash</label>
         <input id="tx" name="tx" placeholder="0x… the transaction that started it" autocomplete="off" spellcheck="false">
-        <select id="chain" aria-label="Chain"><option value="auto">Find the chain for me</option><option value="op">OP Mainnet</option><option value="base">Base</option><option value="arb">Arbitrum One</option><option value="linea">Linea</option><option value="zksync">ZKsync Era</option></select>
+        <select id="chain" aria-label="Chain"><option value="auto">Find the chain for me</option><option value="op">OP Mainnet</option><option value="base">Base</option><option value="arb">Arbitrum One</option><option value="robinhood">Robinhood Chain</option><option value="linea">Linea</option><option value="zksync">ZKsync Era</option></select>
         <button class="go" id="go" type="submit">Check withdrawal →</button>
       </form>
       <p class="hint">Your browser asks public RPCs directly, at the latest finalized Ethereum block. No wallet, no keys, nothing signed.</p>
@@ -241,6 +243,7 @@
         <li><button type="button" data-tx="0xafb31a144d76abfe507df920dc222f2675a562839d8639e9cbace056ab598430"><img src="logos/op.svg" alt="" width="22" height="22"><span>Proven by a third party</span><span class="ex-tag">OP Mainnet</span></button></li>
         <li><button type="button" data-tx="0x95e78c5563149643456198b291f78f6bcfa78488268f440ab88e3dfc59bcb46d"><img src="logos/base.svg" alt="" width="22" height="22"><span>A Base withdrawal</span><span class="ex-tag">Base</span></button></li>
         <li><button type="button" data-tx="0xb1eece7b4253c1f04bf25bf469a8def4dec6c74d61b7f912470f3d40d06361c1"><img src="logos/arb.svg" alt="" width="22" height="22"><span>Claimed by a third party</span><span class="ex-tag">Arbitrum</span></button></li>
+        <li><button type="button" data-tx="0x1cf329e6f0abb246c8c98fe3de832ed826fa6c16f66384bfc1862e65452fb396"><img src="logos/robinhood.svg" alt="" width="22" height="22"><span>0.028 ETH, claimed</span><span class="ex-tag">Robinhood</span></button></li>
         <li><button type="button" data-tx="0x6ee41de9db9157560a67fb52a8047776dd225a4cc3782cb7c9fba27830bc5b88"><img src="logos/linea.svg" alt="" width="22" height="22"><span>Unclaimed since 2024</span><span class="ex-tag">Linea</span></button></li>
         <li><button type="button" data-tx="0x22582717367f72b59a9d7ffc7a326ccc882833fb7f232dc3d83699dc8a02e441"><img src="logos/zksync.svg" alt="" width="22" height="22"><span>Finalized by a third party</span><span class="ex-tag">ZKsync</span></button></li>
       </ul>
@@ -274,7 +277,7 @@
     <article class="feat">
       <span class="fx" aria-hidden="true"><img src="logos/eth.svg" alt="" width="32" height="32"></span>
       <h3>Anyone can finish it</h3>
-      <p>On OP Mainnet and Base, proving and finalizing are open to any address; on Arbitrum One and Linea, so is the claim; on ZKsync Era, so is the finalize step, which ZKsync's own finalizer usually takes. The money only ever goes to the recipient.</p>
+      <p>On OP Mainnet and Base, proving and finalizing are open to any address; on Arbitrum One, Robinhood Chain and Linea, so is the claim; on ZKsync Era, so is the finalize step, which ZKsync's own finalizer usually takes. The money only ever goes to the recipient.</p>
       <p class="tags"><span>Prove</span><span>Finalize</span><span>Claim</span><span>Exact call shown</span></p>
     </article>
     <article class="feat">
@@ -304,7 +307,7 @@
 
   <footer>
     <p>Open source (MIT): <a href="https://github.com/cryppit/wheres-my-withdrawal" target="_blank" rel="noopener noreferrer">github.com/cryppit/wheres-my-withdrawal</a> · by <a href="https://cryppit.near.page/">Cryppit</a></p>
-    <p class="muted">Independent project, not affiliated with Ethereum, Optimism, Base, Arbitrum, Linea or ZKsync. It never holds keys or signs anything. Chain logos: web3icons (MIT).</p>
+    <p class="muted">Independent project, not affiliated with Ethereum, Optimism, Base, Arbitrum, Robinhood, Linea or ZKsync. It never holds keys or signs anything. Chain logos: web3icons (MIT).</p>
   </footer>
 </main>
 <script type="module">

@@ -141,6 +141,19 @@ test("Arbitrum: window over but not confirmed yet: due now, and anyone may confi
   assert.ok(v.notes.some((n) => /confirmAssertion/.test(n)));
 });
 
+test("Robinhood Chain: window over but not confirmed yet: due now, and only its whitelisted validators may confirm", () => {
+  const v = verdict(arb({
+    chain: "robinhood",
+    config: { confirmPeriodBlocks: 45_818, l1BlockSec: 12, cadenceSec: 1800, anyoneCanConfirm: false },
+    covering: { assertion: "0x" + "b".repeat(64), createdAtBlock: BLOCK - 46_000, deadlineBlock: BLOCK - 182 },
+  }));
+  assert.equal(v.state, "WAITING_FOR_CONFIRMATION");
+  assert.equal(v.eta, T);
+  assert.ok(v.notes.some((n) => /only (its|the rollup's) whitelisted validators may confirm/.test(n)));
+  assert.ok(v.notes.some((n) => /about every 30 minutes/.test(n)));
+  assert.ok(!v.notes.some((n) => /anyone may confirm/.test(n)));
+});
+
 test("Arbitrum: confirmed and not spent: anyone can claim it from the Outbox", () => {
   const v = verdict(arb({ confirmed: { assertion: "0x" + "a".repeat(64), l2Block: 501_000_000, sendCount: 167_100, covered: true }, covering: null }));
   assert.equal(v.state, "READY_TO_CLAIM");

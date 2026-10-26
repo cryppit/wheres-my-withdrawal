@@ -137,6 +137,42 @@ test("an ordinary Arbitrum transaction is not a withdrawal", async () => {
   assert.equal(r.error, "not-a-withdrawal");
 });
 
+// Robinhood Chain, recorded on 26 Oct 2026. The same BoLD contracts as Arbitrum One, but its validators are
+// whitelisted and it posts an assertion about every 30 minutes.
+
+test("Robinhood Chain, 0.0283 ETH claimed on Ethereum 7.5 days after it started: done", async () => {
+  const r = await replay("robinhood-claimed-eth");
+  assert.equal(r.verdict.state, "CLAIMED");
+  assert.equal(r.facts.chain, "robinhood");
+  assert.equal(r.facts.withdrawal.position, 3304);
+  assert.equal(r.facts.asset.kind, "eth");
+  assert.equal(r.facts.config.anyoneCanConfirm, false);
+});
+
+test("Robinhood Chain, a token confirmed on Ethereum and never claimed: anyone can claim, with a proof that checks out", async () => {
+  const r = await replay("robinhood-ready-erc20");
+  assert.equal(r.verdict.state, "READY_TO_CLAIM");
+  assert.equal(r.verdict.who, "anyone");
+  assert.equal(r.facts.withdrawal.position, 3319);
+  assert.equal(r.facts.asset.kind, "erc20");
+  assert.equal(r.facts.proof.leafMatches, true);
+  assert.equal(r.facts.proof.rootConfirmed, true);
+});
+
+test("Robinhood Chain, ETH started yesterday, already in an assertion: claim opens when its window ends", async () => {
+  const r = await replay("robinhood-waiting-eth");
+  assert.equal(r.verdict.state, "WAITING_FOR_CONFIRMATION");
+  assert.equal(r.facts.withdrawal.position, 3414);
+  assert.ok(r.facts.covering);
+  assert.equal(r.verdict.eta, r.facts.l1.timestamp + (r.facts.covering.deadlineBlock - r.facts.l1.block) * 12);
+  assert.match(renderText(r), /6\.4-day/);
+});
+
+test("an ordinary Robinhood Chain transaction is not a withdrawal", async () => {
+  const r = await replay("robinhood-not-a-withdrawal");
+  assert.equal(r.error, "not-a-withdrawal");
+});
+
 // Linea, recorded on 24 Oct 2026 at finalized L1 block 26262206. The L1 rollup had finalized L2 blocks up to 32410600.
 
 test("Linea, Oct 2026, 0.332 ETH finalized and not claimed: anyone can claim, with a rebuilt proof that checks out", async () => {

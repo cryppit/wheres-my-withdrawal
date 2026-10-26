@@ -18,7 +18,7 @@ const READERS = { op: readOpStack, arbitrum: readArbitrum, linea: readLinea, zks
 const CLAIMERS = { arbitrum: claimOfArbitrum, zksync: claimOfZksync };
 
 /**
- * Check one withdrawal. `chain` is a key of CHAINS ("op", "base", "arb", "linea", "zksync") or "auto" (ask every
+ * Check one withdrawal. `chain` is a key of CHAINS ("op", "base", "arb", "robinhood", "linea", "zksync") or "auto" (ask every
  * chain's L2 for the transaction at once).
  * `clients(chain)` returns the { l1, l2, l1Archive? } RPC functions; tests pass recorded ones.
  *

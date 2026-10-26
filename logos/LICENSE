@@ -1,4 +1,6 @@
 Chain and coin logos in this folder: SVGs from @web3icons/core 4.0.50 (dist/svgs/*/branded), unmodified.
+robinhood.svg: raw-svgs/networks/branded/robinhood.svg from the web3icons repo at commit 8bf0347 (published as a
+module in @web3icons/core 4.0.58), unmodified.
 https://github.com/0xa3k5/web3icons
 
 MIT License
