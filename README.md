@@ -54,6 +54,21 @@ only to the withdrawal's recipient. Whoever proves must also finalize it later (
 Public L2 endpoints serve proofs only for recent blocks (mainnet.optimism.io: 10,000), which is why it proves against a
 recent game rather than an old resolved one; the proof stays valid after that window.
 
+
+## Build the claim step yourself (Arbitrum One, Robinhood Chain, Linea)
+
+`node cli.js <L2 tx hash> --claim --chain arb|robinhood|linea [--from 0x…]` builds the claim from what the check reads
+and rehearses it with `eth_call`, read-only:
+
+- Arbitrum One and Robinhood Chain: `Outbox.executeTransaction` with the proof from `NodeInterface.constructOutboxProof`,
+  used only when its leaf is this withdrawal and its root is one the Outbox confirmed;
+- Linea: `claimMessageWithProof` with the Merkle proof rebuilt from the L1 finalization, used only when its root is one
+  that finalization added, or `claimMessage` for messages from before Alpha v2. The fee recipient is left empty, so a
+  message fee (most withdrawals pay none) goes to whoever sends the claim.
+
+It refuses a withdrawal that is not ready to claim. Anyone can send the printed call from their own wallet; the funds go
+only to the withdrawal's recipient.
+
 ## How it decides (October 2026)
 
 OP Mainnet and Base changed their proof systems in 2026, and checks written for the 2024 layout get both wrong.

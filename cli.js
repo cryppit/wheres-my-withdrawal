@@ -1,11 +1,13 @@
 #!/usr/bin/env node
 // Usage: node cli.js <L2 tx hash> [--chain op|base|unichain|ink|soneium|worldchain|mode|zora|arb|robinhood|linea|zksync] [--index n] [--json]
 //        node cli.js <OP Stack L2 tx hash> --prove [--chain op] [--from 0x…] [--json]   build and rehearse the prove call
+//        node cli.js <L2 tx hash> --claim --chain arb|robinhood|linea [--from 0x…] [--json]   build and rehearse the claim
 import { check } from "./src/check.js";
 import { renderText } from "./src/render.js";
 import { CHAINS } from "./src/chains.js";
 import { makeRpc } from "./src/rpc.js";
 import { buildProve, buildBlastProve } from "./src/prove.js";
+import { buildClaim } from "./src/claim.js";
 
 const argv = process.argv.slice(2);
 const flag = (name) => {
@@ -16,6 +18,18 @@ const tx = argv.find((a) => a.startsWith("0x"));
 if (!tx) {
   console.error(`Usage: node cli.js <L2 tx hash> [--chain ${Object.keys(CHAINS).join("|")}] [--index n] [--json]`);
   process.exit(2);
+}
+if (argv.includes("--claim")) {
+  // Read-only: builds the claim from public data and rehearses it with eth_call. Nothing is sent.
+  const chain = CHAINS[flag("chain") ?? "arb"];
+  const c = await buildClaim(chain ?? {}, tx, { index: Number(flag("index") ?? 0), ...(flag("from") ? { from: flag("from") } : {}) });
+  if (argv.includes("--json") || c.error) console.log(JSON.stringify(c, (k, v) => (typeof v === "bigint" ? v.toString() : v), 2));
+  else {
+    console.log(`${chain.name} withdrawal ${tx}: ready to claim`);
+    console.log(`Rehearsal (eth_call from ${c.rehearsal.from}): ${c.rehearsal.ok ? `passes, about ${c.rehearsal.gas} gas` : `reverts: ${c.rehearsal.error}`}`);
+    console.log(`\nSend to ${c.call.to}, value 0, data:\n${c.call.data}`);
+  }
+  process.exit(c.error || !c.rehearsal?.ok ? 1 : 0);
 }
 if (argv.includes("--prove")) {
   // Read-only: builds proveWithdrawalTransaction from public data and rehearses it with eth_call. Nothing is sent.

@@ -96,7 +96,7 @@ const BY_SELECTOR = new Map(ERRORS.map((e) => [selector(`${e}()`), e]));
 export const revertName = (data) => (typeof data === "string" ? BY_SELECTOR.get(data.slice(0, 10).toLowerCase()) ?? null : null);
 
 /** One raw eth_call over the L1 endpoints that keeps the revert data (the shared client only says "reverted"). */
-async function rehearse(urls, call, doFetch = globalThis.fetch) {
+export async function rehearse(urls, call, doFetch = globalThis.fetch) {
   const problems = [];
   for (const url of urls) {
     try {
