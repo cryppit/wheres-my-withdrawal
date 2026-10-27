@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { encodeProveCall, encodeFinalizeCall, outputRootHash, withdrawalSlot, blockAtTimestamp, revertName } from "../src/prove.js";
+import { encodeProveCall, encodeFinalizeCall, encodeFinalizeExternalCall, outputRootHash, withdrawalSlot, blockAtTimestamp, revertName } from "../src/prove.js";
 
 // The reference encodings below were made with eth_abi 5.2.0, not with this code.
 const TX = {
@@ -43,4 +43,11 @@ test("the L2 block at a timestamp is counted back from the head at the chain's b
 test("a revert from the portal is named by its error selector", () => {
   assert.equal(revertName("0x2e57ef3a"), "OptimismPortal_InvalidMerkleProof");
   assert.equal(revertName("0x12345678"), null);
+});
+
+test("finalizeWithdrawalTransactionExternalProof (anyone finalizes with another account's proof) matches eth_abi", () => {
+  assert.equal(
+    encodeFinalizeExternalCall(TX, "0x8fc7489af1fc446146b2a9a3ea6c91cf79ee12cc"),
+    "0x43ca1c5000000000000000000000000000000000000000000000000000000000000000400000000000000000000000008fc7489af1fc446146b2a9a3ea6c91cf79ee12cc000000000000000000000000000000000000000000000000000000000001c6b2000000000000000000000000420000000000000000000000000000000000000700000000000000000000000025ace71c97b33cc4729cf772ae268934f7ab5fa1000000000000000000000000000000000000000000000000003fe0b6f90fc000000000000000000000000000000000000000000000000000000000000013f3c900000000000000000000000000000000000000000000000000000000000000c00000000000000000000000000000000000000000000000000000000000000029d764ad0bababababababababababababababababababababababababababababababababababababab0000000000000000000000000000000000000000000000",
+  );
 });

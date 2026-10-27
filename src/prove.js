@@ -58,6 +58,20 @@ export function encodeFinalizeCall(tx) {
   return selector(FINALIZE_SIG) + uint(32) + txTuple(tx);
 }
 
+/** Anyone can finalize with another account's proof: finalizeWithdrawalTransactionExternalProof(tx, proofSubmitter). */
+export function encodeFinalizeExternalCall(tx, proofSubmitter) {
+  return selector(`finalizeWithdrawalTransactionExternalProof(${TX_TUPLE},address)`) + uint(64) + pad(proofSubmitter) + txTuple(tx);
+}
+
+/**
+ * Whether a proven withdrawal can be finalized now with `proofSubmitter`'s proof, asked of the portal itself
+ * (checkWithdrawal reverts with the reason while it cannot). Read-only.
+ */
+export async function finalizeReadiness(portal, withdrawalHash, proofSubmitter, l1Urls, doFetch) {
+  const r = await rehearse(l1Urls, { to: portal, data: encodeCall("checkWithdrawal(bytes32,address)", [withdrawalHash, proofSubmitter]) }, doFetch);
+  return r.ok ? { ready: true } : { ready: false, reason: r.error };
+}
+
 /** Hashing.hashOutputRootProof: keccak256(abi.encode(version, stateRoot, messagePasserStorageRoot, latestBlockhash)). */
 export const outputRootHash = (orp) => keccak256(fromHex("0x" + pad(orp.version) + pad(orp.stateRoot) + pad(orp.messagePasserStorageRoot) + pad(orp.latestBlockhash)));
 
