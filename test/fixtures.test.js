@@ -385,3 +385,76 @@ test("a malformed hash is refused before any network call", async () => {
   const r = await check("0x1234", { clients: () => { throw new Error("no network expected"); } });
   assert.equal(r.error, "bad-hash");
 });
+
+// Six more OP Stack chains on the same contracts, recorded 27 Oct 2026.
+test("Unichain, super game (type 9): 700 UNI proven by its owner, waiting", async () => {
+  const r = await replay("unichain-proven-uni");
+  assert.equal(r.verdict.state, "WAITING_TO_FINALIZE");
+  assert.equal(r.facts.asset.symbol, "UNI");
+  assert.equal(r.facts.asset.amount, 700n * 10n ** 18n);
+  assert.equal(r.facts.proofs[0].game.type, 9);
+});
+
+test("Ink, 0.0009 ETH never proven: anyone can prove it", async () => {
+  const r = await replay("ink-ready-to-prove");
+  assert.equal(r.verdict.state, "READY_TO_PROVE");
+  assert.equal(r.verdict.who, "anyone");
+  assert.equal(r.facts.asset.amount, 900000000000000n);
+  assert.equal(r.facts.coverage.latestGameType, 9);
+});
+
+test("Soneium, super permissioned game (type 5): 0.39 ETH ready to prove", async () => {
+  const r = await replay("soneium-ready-to-prove");
+  assert.equal(r.verdict.state, "READY_TO_PROVE");
+  assert.equal(r.facts.asset.amount, 390000000000000000n);
+  assert.equal(r.facts.coverage.latestGameType, 5);
+});
+
+test("World Chain, permissioned game (type 1): 27.47 sDAI proven, waiting", async () => {
+  const r = await replay("worldchain-proven-sdai");
+  assert.equal(r.verdict.state, "WAITING_TO_FINALIZE");
+  assert.equal(r.facts.asset.symbol, "sDAI");
+  assert.equal(r.facts.proofs[0].game.type, 1);
+});
+
+test("Mode, 131,424.64 USDC finalized and relayed", async () => {
+  const r = await replay("mode-finalized-usdc");
+  assert.equal(r.verdict.state, "FINALIZED");
+  assert.equal(r.facts.asset.amount, 131424642022n);
+  assert.equal(r.facts.relay, "ok");
+});
+
+test("Zora, ETH withdrawal finalized", async () => {
+  const r = await replay("zora-finalized-eth");
+  assert.equal(r.verdict.state, "FINALIZED");
+  assert.equal(r.facts.asset.kind, "eth");
+});
+
+// Blast: the pre-fault-proof portal with an L2OutputOracle and an ETH yield manager (src/blast.js), recorded 27 Oct 2026.
+test("Blast, 1.75 ETH through the Blast bridge, finalized", async () => {
+  const r = await replay("blast-finalized-eth");
+  assert.equal(r.verdict.state, "FINALIZED");
+  assert.equal(r.facts.asset.kind, "eth");
+  assert.equal(r.facts.asset.amount, 1753759000000000000n);
+});
+
+test("Blast, ETH proven on 24 Oct, its yield-manager request finalized: ready, with checkpoint hint 707", async () => {
+  const r = await replay("blast-ready-to-finalize-eth");
+  assert.equal(r.verdict.state, "READY_TO_FINALIZE");
+  assert.equal(r.facts.queue.hint, 707n);
+  assert.match(r.verdict.action, /hintId 707/);
+  assert.equal(r.facts.config.maturitySec, 86400);
+});
+
+test("Blast, USDB ready to finalize: the recipient must then claim the DAI", async () => {
+  const r = await replay("blast-ready-to-finalize-usdb");
+  assert.equal(r.verdict.state, "READY_TO_FINALIZE");
+  assert.equal(r.facts.usdb, true);
+  assert.match(renderText(r), /only the recipient can claim/);
+});
+
+test("Blast, never proven, covered by an output: anyone can prove it", async () => {
+  const r = await replay("blast-ready-to-prove");
+  assert.equal(r.verdict.state, "READY_TO_PROVE");
+  assert.equal(r.facts.coverage.covered, true);
+});

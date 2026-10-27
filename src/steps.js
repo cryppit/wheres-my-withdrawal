@@ -4,6 +4,7 @@
 /** Each stack's stops, and for each verdict state how far along it is: the index of the stop it is at and how. */
 const STACKS = {
   op: ["Started on L2", "Prove", "Challenge window", "Finalize on Ethereum"],
+  blast: ["Started on L2", "Prove", "Challenge window", "Finalize on Ethereum"],
   arbitrum: ["Started on L2", "Confirmed on Ethereum", "Claim"],
   linea: ["Started on L2", "Finalized on Ethereum", "Claim"],
   zksync: ["Started on L2", "Batch executed on Ethereum", "Finalize"],
@@ -37,7 +38,7 @@ function position(stack, state) {
 }
 
 /**
- * @param {"op"|"arbitrum"|"linea"|"zksync"} stack
+ * @param {"op"|"blast"|"arbitrum"|"linea"|"zksync"} stack
  * @param {{ state: string, eta?: number }} v the verdict
  * @returns {{ title: string, state: "done"|"next"|"waiting"|"stopped"|"not_reached", eta?: number }[]}
  */

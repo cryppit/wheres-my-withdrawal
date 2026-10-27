@@ -2,6 +2,7 @@
 import { CHAINS } from "./chains.js";
 import { makeRpc } from "./rpc.js";
 import { readFacts as readOpStack } from "./opstack.js";
+import { readFacts as readBlast } from "./blast.js";
 import { readFacts as readArbitrum, claimOf as claimOfArbitrum } from "./arbitrum.js";
 import { readFacts as readLinea } from "./linea.js";
 import { readFacts as readZksync, claimOf as claimOfZksync } from "./zksync.js";
@@ -13,12 +14,12 @@ export function clientsFor(chain, opts = {}) {
   return clients;
 }
 
-const READERS = { op: readOpStack, arbitrum: readArbitrum, linea: readLinea, zksync: readZksync };
+const READERS = { op: readOpStack, blast: readBlast, arbitrum: readArbitrum, linea: readLinea, zksync: readZksync };
 // The slow "who sent the last step" searches, run after the verdict when the page asks for deferExtras.
 const CLAIMERS = { arbitrum: claimOfArbitrum, zksync: claimOfZksync };
 
 /**
- * Check one withdrawal. `chain` is a key of CHAINS ("op", "base", "arb", "robinhood", "linea", "zksync") or "auto" (ask every
+ * Check one withdrawal. `chain` is a key of CHAINS ("op", "base", "blast", "arb", "linea", …) or "auto" (ask every
  * chain's L2 for the transaction at once).
  * `clients(chain)` returns the { l1, l2, l1Archive? } RPC functions; tests pass recorded ones.
  *

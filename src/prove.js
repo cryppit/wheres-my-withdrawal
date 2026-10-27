@@ -3,7 +3,7 @@
 // encoded proveWithdrawalTransaction call, and a rehearsal of that call with eth_call. Read-only: nothing is signed or
 // sent; whoever submits the call pays only the gas, and the funds still go only to the withdrawal's recipient.
 
-import { encodeCall, addressAt, uintAt, fromHex, selector } from "./abi.js";
+import { encodeCall, addressAt, uintAt, boolAt, fromHex, selector } from "./abi.js";
 import { keccak256 } from "./keccak.js";
 import { SUPER_GAME_TYPES, PREDEPLOYS } from "./chains.js";
 import { withdrawalsIn, legacyWithdrawalsIn } from "./opstack.js";
@@ -63,6 +63,11 @@ export function encodeFinalizeExternalCall(tx, proofSubmitter) {
   return selector(`finalizeWithdrawalTransactionExternalProof(${TX_TUPLE},address)`) + uint(64) + pad(proofSubmitter) + txTuple(tx);
 }
 
+/** Blast's portal (1.10.0) takes the ETH yield manager's checkpoint hint first: finalizeWithdrawalTransaction(hintId, tx). */
+export function encodeBlastFinalizeCall(hintId, tx) {
+  return selector(`finalizeWithdrawalTransaction(uint256,${TX_TUPLE})`) + uint(hintId) + uint(64) + txTuple(tx);
+}
+
 /**
  * Whether a proven withdrawal can be finalized now with `proofSubmitter`'s proof, asked of the portal itself
  * (checkWithdrawal reverts with the reason while it cannot). Read-only.
@@ -108,7 +113,7 @@ async function rehearse(urls, call, doFetch = globalThis.fetch) {
   return { ok: false, error: `no endpoint answered (${problems.join("; ")})` };
 }
 
-/** How far back the L2 endpoints serve eth_getProof (mainnet.optimism.io: 10,000 blocks), with a margin. */
+/** How far back the L2 endpoints serve eth_getProof (mainnet.optimism.io: 10,000 blocks), with a margin; a chain profile's proofWindowBlocks overrides it. */
 const PROOF_WINDOW = 9_000;
 const GAME_STATUS = ["in progress", "challenger wins", "defender wins"];
 
@@ -116,7 +121,18 @@ const GAME_STATUS = ["in progress", "challenger wins", "defender wins"];
  * Everything the prove step needs, rehearsed. `from` is the account that will send it (any account works; the
  * rehearsal uses it as the sender). Throws only on transport failures; a problem with the withdrawal is returned.
  */
-export async function buildProve(chain, txHash, { l1, l2 }, { index = 0, from = "0x000000000000000000000000000000000000dEaD", blockTimeSec = 2, scan = 40, l1Urls = chain.l1Rpcs, doFetch } = {}) {
+/** Some public endpoints answer eth_getProof only some of the time (Unichain's, 27 Oct 2026): ask again. */
+async function retry(fn, tries) {
+  for (let i = 1; ; i++) {
+    try {
+      return await fn();
+    } catch (e) {
+      if (i >= tries) throw e;
+    }
+  }
+}
+
+export async function buildProve(chain, txHash, { l1, l2 }, { index = 0, from = "0x000000000000000000000000000000000000dEaD", blockTimeSec = chain.blockTimeSec ?? 2, scan = 40, l1Urls = chain.l1Rpcs, doFetch } = {}) {
   const receipt = await l2("eth_getTransactionReceipt", [txHash]);
   if (!receipt) return { error: "not-found" };
   let all = withdrawalsIn(receipt);
@@ -131,6 +147,10 @@ export async function buildProve(chain, txHash, { l1, l2 }, { index = 0, from = 
     return r && r.reverted ? null : r;
   };
   const portal = chain.portal;
+  // The portal would accept a new proof even then, and the gas would be wasted.
+  if (boolAt(await view(portal, "finalizedWithdrawals(bytes32)", [w.hash]), 0)) {
+    return { error: "already-finalized", message: "This withdrawal is already finalized on Ethereum: there is nothing to prove." };
+  }
   const dgf = addressAt(await view(portal, "disputeGameFactory()"), 0);
   const asr = addressAt(await view(portal, "anchorStateRegistry()"), 0);
   const respected = Number(uintAt(await view(asr, "respectedGameType()"), 0));
@@ -165,7 +185,7 @@ export async function buildProve(chain, txHash, { l1, l2 }, { index = 0, from = 
     }
     const seq = Number(uintAt(await view(proxy, "l2SequenceNumber()"), 0));
     let n = isSuper ? blockAtTimestamp(headN, seq, blockTimeSec) : seq;
-    if (headN.number - n > PROOF_WINDOW) {
+    if (headN.number - n > (chain.proofWindowBlocks ?? PROOF_WINDOW)) {
       skipped.push({ index: i, why: "L2 block older than the endpoints' proof window" });
       break; // older games are only further back
     }
@@ -182,7 +202,7 @@ export async function buildProve(chain, txHash, { l1, l2 }, { index = 0, from = 
   }
   const blockTag = "0x" + game.l2BlockNumber.toString(16);
   const slot = withdrawalSlot(w.hash);
-  const proof = await l2("eth_getProof", [PREDEPLOYS.messagePasser, [slot], blockTag]);
+  const proof = await retry(() => l2("eth_getProof", [PREDEPLOYS.messagePasser, [slot], blockTag]), chain.proofTries ?? 1);
   const orp = { version: "0x" + "00".repeat(32), stateRoot: block.stateRoot, messagePasserStorageRoot: proof.storageHash, latestBlockhash: block.hash };
   const claim = isSuper ? await view(game.proxy, "rootClaimByChainId(uint256)", [l2ChainId]) : await view(game.proxy, "rootClaim()");
   const outputRoot = outputRootHash(orp);
@@ -209,5 +229,68 @@ export async function buildProve(chain, txHash, { l1, l2 }, { index = 0, from = 
     call: { to: portal, value: "0", data: calldata },
     rehearsal: { from, ...rehearsal, gas },
     finalizeCall: { to: portal, value: "0", data: encodeFinalizeCall(tx) },
+  };
+}
+
+/**
+ * Blast's prove step (OptimismPortal 1.10.0): proven against an L2OutputOracle output instead of a dispute game. Any
+ * output at or after the withdrawal's block works, so it uses the newest, whose block the endpoints can still prove.
+ * The portal takes one proof per withdrawal unless that proof's output was replaced.
+ */
+export async function buildBlastProve(chain, txHash, { l1, l2 }, { index = 0, from = "0x000000000000000000000000000000000000dEaD", l1Urls = chain.l1Rpcs, doFetch } = {}) {
+  const receipt = await l2("eth_getTransactionReceipt", [txHash]);
+  if (!receipt) return { error: "not-found" };
+  const w = withdrawalsIn(receipt)[index];
+  if (!w) return { error: "not-a-withdrawal" };
+  const tx = { nonce: w.nonce, sender: w.sender, target: w.target, value: w.value, gasLimit: w.gasLimit, data: w.data };
+  const l2Block = Number(BigInt(receipt.blockNumber));
+  const view = async (to, sig, args = []) => {
+    const r = await l1("eth_call", [{ to, data: encodeCall(sig, args) }, "latest"]);
+    return r && r.reverted ? null : r;
+  };
+  const { portal, l2Oracle: oracle } = chain;
+  if (boolAt(await view(portal, "finalizedWithdrawals(bytes32)", [w.hash]), 0)) {
+    return { error: "already-finalized", message: "This withdrawal is already finalized on Ethereum: there is nothing to prove." };
+  }
+  const proven = await view(portal, "provenWithdrawals(bytes32)", [w.hash]);
+  if (uintAt(proven, 1) > 0n) {
+    const still = await view(oracle, "getL2Output(uint256)", [uintAt(proven, 2)]);
+    if (still && strip(still).slice(0, 64) === strip(proven).slice(0, 64)) {
+      return { error: "already-proven", message: "This withdrawal is already proven, and Blast's portal takes only one proof: the next step is finalize." };
+    }
+  }
+  const outputIndex = uintAt(await view(oracle, "latestOutputIndex()"), 0);
+  const output = await view(oracle, "getL2Output(uint256)", [outputIndex]);
+  const outputBlock = Number(uintAt(output, 2));
+  if (outputBlock < l2Block) return { error: "no-output", message: "No output proposal on L1 covers this withdrawal yet: try again in about an hour." };
+  const blockTag = "0x" + outputBlock.toString(16);
+  const block = await l2("eth_getBlockByNumber", [blockTag, false]);
+  const proof = await retry(() => l2("eth_getProof", [PREDEPLOYS.messagePasser, [withdrawalSlot(w.hash)], blockTag]), chain.proofTries ?? 1);
+  const orp = { version: "0x" + "00".repeat(32), stateRoot: block.stateRoot, messagePasserStorageRoot: proof.storageHash, latestBlockhash: block.hash };
+  const outputRoot = outputRootHash(orp);
+  const stored = proof.storageProof[0];
+  const checks = {
+    outputRootMatchesGame: outputRoot === "0x" + strip(output).slice(0, 64),
+    withdrawalStoredOnL2: stored && BigInt(stored.value) === 1n,
+  };
+  const calldata = encodeProveCall(tx, outputIndex, orp, stored.proof);
+  const rehearsal = await rehearse(l1Urls, { from, to: portal, data: calldata }, doFetch);
+  let gas = null;
+  if (rehearsal.ok) {
+    const est = await l1("eth_estimateGas", [{ from, to: portal, data: calldata }]).catch(() => null);
+    gas = est ? Number(BigInt(est)) : null;
+  }
+  return {
+    withdrawal: { ...tx, hash: w.hash, l2Block },
+    portal,
+    output: { index: Number(outputIndex), oracle, l2BlockNumber: outputBlock, timestamp: Number(uintAt(output, 1)) },
+    outputRootProof: orp,
+    outputRoot,
+    withdrawalProof: stored.proof,
+    checks,
+    call: { to: portal, value: "0", data: calldata },
+    rehearsal: { from, ...rehearsal, gas },
+    // An ETH withdrawal's finalize needs the yield manager's checkpoint hint, known only once its request is finalized.
+    finalizeCall: w.value > 0n ? null : { to: portal, value: "0", data: encodeBlastFinalizeCall(0n, tx) },
   };
 }

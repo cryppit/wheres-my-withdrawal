@@ -27,7 +27,7 @@
   * { box-sizing: border-box; }
   html, body { margin: 0; background: radial-gradient(1100px 600px at 80% -10%, rgba(42, 59, 214, 0.28), transparent 60%), var(--deep); color: var(--ink); font: 16px/1.55 system-ui, -apple-system, "Segoe UI", sans-serif; }
   a { color: var(--lime); text-underline-offset: 3px; }
-  img[src$="linea.svg"], img[src$="zksync.svg"] { background: #f3efe4; border-radius: 50%; padding: 3px; box-sizing: border-box; }
+  img[src$="linea.svg"], img[src$="zksync.svg"], img[src$="soneium.svg"], img[src$="worldchain.svg"] { background: #f3efe4; border-radius: 50%; padding: 3px; box-sizing: border-box; }
   input:focus-visible, button:focus-visible, select:focus-visible { outline: 2px solid var(--lime); outline-offset: 2px; }
   button.go:disabled { opacity: 0.6; cursor: wait; }
   #out { margin-top: 28px; }
@@ -112,6 +112,10 @@
   .stats dt { font-size: 18px; font-weight: 800; color: var(--lime); white-space: nowrap; }
   .stats dd { margin: 2px 0 0; color: var(--mute); font-size: 13px; }
   @media (max-width: 560px) { .stats { grid-template-columns: repeat(2, minmax(0, 1fr)); row-gap: 16px; } .stats div:nth-child(3) { padding-left: 0; border-left: 0; } }
+  .more-l2s { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; margin: 22px 0 0; color: #d9dcec; font-size: 13.5px; font-weight: 650; }
+  .more-l2s span { color: var(--mute); font-weight: 500; margin-right: 2px; }
+  .more-l2s img { width: 22px; height: 22px; padding: 3px; border-radius: 50%; background: radial-gradient(circle at 35% 30%, #18204f, #070b22 70%); box-shadow: inset 0 0 0 1px rgba(221, 242, 74, 0.45); vertical-align: middle; margin-right: -4px; }
+  .more-l2s img[src$="soneium.svg"], .more-l2s img[src$="worldchain.svg"] { background: #f3efe4; }
 
   /* The art: the six rollups on the left, light routes climbing into a glowing Ethereum coin. */
   .hero-art { position: relative; min-height: 430px; border-radius: 24px; overflow: hidden; background: radial-gradient(closest-side at 75% 50%, rgba(143, 180, 255, 0.25), transparent 70%), url(art/withdrawal.jpg) center / cover no-repeat; box-shadow: inset 0 0 0 1px rgba(143, 180, 255, 0.2), 0 40px 120px -50px rgba(42, 59, 214, 0.8); }
@@ -225,11 +229,12 @@
       <p class="lede">Paste the transaction that started your withdrawal from an L2 to Ethereum. See whether it is done, what step is missing, when it opens, and who can take it, read from Ethereum itself.</p>
       <p class="ctas"><a class="btn lime-btn" href="#check">Check a withdrawal →</a><a class="btn ghost-btn" href="https://github.com/cryppit/wheres-my-withdrawal" target="_blank" rel="noopener noreferrer">View on GitHub</a></p>
       <dl class="stats">
-        <div><dt>6 rollups</dt><dd>to Ethereum</dd></div>
+        <div><dt>13 rollups</dt><dd>to Ethereum</dd></div>
         <div><dt>0 keys</dt><dd>nothing to sign</dd></div>
         <div><dt>MIT</dt><dd>open source</dd></div>
-        <div><dt>110 tests</dt><dd>on recorded data</dd></div>
+        <div><dt>139 tests</dt><dd>on recorded data</dd></div>
       </dl>
+      <p class="more-l2s"><span>Also</span><img src="logos/unichain.svg" alt="" width="22" height="22">Unichain <img src="logos/ink.svg" alt="" width="22" height="22">Ink <img src="logos/soneium.svg" alt="" width="22" height="22">Soneium <img src="logos/worldchain.svg" alt="" width="22" height="22">World Chain <img src="logos/mode.svg" alt="" width="22" height="22">Mode <img src="logos/zora.svg" alt="" width="22" height="22">Zora <img src="logos/blast.svg" alt="" width="22" height="22">Blast</p>
     </div>
 
     <div class="hero-art" aria-hidden="true">
@@ -259,7 +264,7 @@
       <form id="f">
         <label for="tx">L2 transaction hash</label>
         <input id="tx" name="tx" placeholder="0x… the transaction that started it" autocomplete="off" spellcheck="false">
-        <select id="chain" aria-label="Chain"><option value="auto">Find the chain for me</option><option value="op">OP Mainnet</option><option value="base">Base</option><option value="arb">Arbitrum One</option><option value="robinhood">Robinhood Chain</option><option value="linea">Linea</option><option value="zksync">ZKsync Era</option></select>
+        <select id="chain" aria-label="Chain"><option value="auto">Find the chain for me</option><optgroup label="OP Stack"><option value="op">OP Mainnet</option><option value="base">Base</option><option value="unichain">Unichain</option><option value="ink">Ink</option><option value="soneium">Soneium</option><option value="worldchain">World Chain</option><option value="mode">Mode</option><option value="zora">Zora</option><option value="blast">Blast</option></optgroup><optgroup label="Arbitrum"><option value="arb">Arbitrum One</option><option value="robinhood">Robinhood Chain</option></optgroup><optgroup label="Other rollups"><option value="linea">Linea</option><option value="zksync">ZKsync Era</option></optgroup></select>
         <button class="go" id="go" type="submit">Check withdrawal →</button>
       </form>
       <p class="hint">Your browser asks public RPCs directly, at the latest finalized Ethereum block. No wallet, no keys, nothing signed.</p>
@@ -316,7 +321,7 @@
       <span class="fx fx-code" aria-hidden="true"></span>
       <h3>Read from Ethereum</h3>
       <p>Your browser asks public RPCs directly, pinned to the latest finalized Ethereum block, and every wait is read live from the contracts. No wallet, no keys, nothing signed, nothing stored.</p>
-      <p class="tags"><span>MIT</span><span>No keys</span><span>No server</span><span>110 tests</span></p>
+      <p class="tags"><span>MIT</span><span>No keys</span><span>No server</span><span>139 tests</span></p>
     </article>
   </section>
 
@@ -431,7 +436,7 @@
     if (v.eta) { const e = el("span", "eta", left(v.eta)); const w = el("span"); w.append(e, el("span", null, `  ${utc(v.eta)}`)); row(dl, "Next step opens", w); }
     if (v.who === "anyone") row(dl, "Who can do it", "Anyone. The money only goes to the recipient.");
     if (f.asset.to) row(dl, "Recipient", f.asset.to, true);
-    if (v.proof) row(dl, "Proven", `${utc(v.proof.provenAt)} by ${whoIs(v.proof.submitter, f)}`);
+    if (v.proof) row(dl, "Proven", v.proof.submitter ? `${utc(v.proof.provenAt)} by ${whoIs(v.proof.submitter, f)}` : utc(v.proof.provenAt));
     const claimed = claimLine(v, f);
     if (claimed) row(dl, claimVerb(v), claimed);
     const dev = el("dl");

@@ -75,7 +75,7 @@ export function assetOf(w, chain) {
   const args = "0x" + w.data.slice(10);
   const innerTarget = addressAt(args, 2);
   const message = decodeBytes(args, 5);
-  if (sameAddress(innerTarget, chain.l1StandardBridge)) {
+  if ([chain.l1StandardBridge, ...(chain.l1ExtraBridges ?? [])].some((b) => sameAddress(innerTarget, b))) {
     const m = "0x" + message.slice(10);
     if (message.startsWith(FINALIZE_ETH) || message.startsWith(LEGACY_FINALIZE_ETH)) return { kind: "eth", amount: uintAt(m, 2), from: addressAt(m, 0), to: addressAt(m, 1) };
     if (message.startsWith(LEGACY_FINALIZE_ERC20)) {

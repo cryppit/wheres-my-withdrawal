@@ -77,7 +77,7 @@ export function renderText(r) {
   ];
   const plain = plainNext(r);
   lines.push("", "What this means for you:", `  ${plain.headline}`, ...plain.steps.map((st, i) => `  ${i + 1}. ${st}`), "", "Details:");
-  if (v.proof) lines.push(`  proven ${utc(v.proof.provenAt)} by ${whoIs(v.proof.submitter, f)}`);
+  if (v.proof) lines.push(`  proven ${utc(v.proof.provenAt)}${v.proof.submitter ? ` by ${whoIs(v.proof.submitter, f)}` : ""}`);
   if (v.claim) lines.push(`  ${claimVerb(v).toLowerCase()} ${claimedWhen(v.claim)} by ${whoIs(v.claim.by, f)}`);
   if (v.eta) lines.push(`  next step opens about ${utc(v.eta)}`);
   if (v.who === "anyone") lines.push(`  who can do it: anyone. The money only goes to ${f.asset.to ?? f.withdrawal.target}.`);

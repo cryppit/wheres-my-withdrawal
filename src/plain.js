@@ -13,6 +13,10 @@ function when(eta, now) {
   return `${utc(eta)}, in ${rel}`;
 }
 
+const days = (sec) => (sec % 86400 === 0 ? `${sec / 86400} day${sec === 86400 ? "" : "s"}` : `${Math.round(sec / 3600)} hours`);
+/** "about once an hour", "about every 6 hours", from a chain's proposal cadence. */
+const every = (sec = 3600) => (sec <= 3600 ? "about once an hour" : `about every ${Math.round(sec / 3600)} hours`);
+
 /** { headline, steps[] } for a check result (not for errors). */
 export function plainNext(r) {
   const { chain, facts: f, verdict: v } = r;
@@ -21,11 +25,24 @@ export function plainNext(r) {
   const now = f.l1.timestamp;
   const stack = chain.stack;
   const onlyTo = `Anyone can send it, and the money can only go to ${to}.`;
+  // OP Stack chains wait 7 days between prove and finalize; Blast's oracle sets its own period (one day).
+  const wait = stack === "blast" ? days(f.config.maturitySec) : "7 days";
+  const usdbClaim = f.usdb ? [`This is USDB: after finalize, only ${to} can claim the DAI, from Blast's bridge app.`] : [];
   const old = f.legacy ? ["Bridge apps don't list it because it started before June 2023, when OP Mainnet upgraded. It still works the same way."] : [];
 
   switch (v.state) {
     case "FINALIZED":
     case "CLAIMED":
+      if (f.usdb) {
+        return {
+          headline: "Finalized. One more step: the recipient claims the DAI on Ethereum.",
+          steps: [
+            "This was USDB. Blast's bridge turned it into a DAI claim on Ethereum instead of paying it straight away.",
+            `Only ${to} can claim it: open Blast's bridge app with that wallet and claim the pending withdrawal. If it was already claimed, nothing is left to do.`,
+            SCAM,
+          ],
+        };
+      }
       return {
         headline: "Your money arrived on Ethereum. Nothing is left to do.",
         steps: [
@@ -53,7 +70,8 @@ export function plainNext(r) {
         steps: [
           "Your money is safe where it is, and the withdrawal doesn't expire, so there is no rush.",
           "Step 1 of 2, now: prove the withdrawal on Ethereum. It is one transaction. A bridge app usually does it with one click; if yours doesn't show this withdrawal, someone you trust who uses Ethereum developer tools can send it from their own wallet.",
-          `Step 2 of 2, 7 days later: finalize. That transaction pays the money to ${to}.`,
+          `Step 2 of 2, ${wait} later: finalize. That transaction pays the money to ${to}.`,
+          ...usdbClaim,
           `Anyone can send these two transactions, and the money can only go to ${to}. Whoever sends them pays only the gas.`,
           ...old,
           SCAM,
@@ -64,9 +82,9 @@ export function plainNext(r) {
       return {
         headline: "Your withdrawal is on its way. Nothing to do yet.",
         steps: [
-          `${chain.name} reports its latest state to Ethereum about once an hour, and that report doesn't cover your withdrawal yet.`,
+          `${chain.name} reports its latest state to Ethereum ${every(chain.cadenceSec)}, and that report doesn't cover your withdrawal yet.`,
           ...(v.eta ? [`Check again after ${when(v.eta, now)}.`] : []),
-          `Then it can be proven (step 1 of 2), and 7 days later finalized (step 2 of 2), which pays the money to ${to}.`,
+          `Then it can be proven (step 1 of 2), and ${wait} later finalized (step 2 of 2), which pays the money to ${to}.`,
         ],
       };
 
@@ -77,6 +95,7 @@ export function plainNext(r) {
           "Step 1 of 2 (prove) is done.",
           `Step 2 of 2 (finalize) opens ${when(v.eta, now)}. Then one transaction pays the money to ${to}. ${onlyTo}`,
           "Nothing to do until then. If someone else sent the first step, you owe them nothing.",
+          ...usdbClaim,
           ...old,
         ],
       };
@@ -84,12 +103,13 @@ export function plainNext(r) {
     case "READY_TO_FINALIZE": {
       const zk = stack === "zksync";
       return {
-        headline: "Ready: one last transaction pays your money.",
+        headline: f.usdb ? "Ready to finalize. After that, the recipient claims the DAI." : "Ready: one last transaction pays your money.",
         steps: [
           zk
             ? "ZKsync has confirmed your withdrawal on Ethereum. The last step, finalize, can be sent now; ZKsync's own service usually sends it for you within a few hours."
             : "The waiting period is over. The last step, finalize, can be sent now.",
           `It is one transaction on Ethereum: a bridge app usually shows a button for it, or someone you trust can send it from their own wallet. ${onlyTo}`,
+          ...usdbClaim,
           SCAM,
         ],
       };

@@ -29,6 +29,7 @@ export function verdict(f) {
   if (f.stack === "arbitrum") return arbitrumVerdict(f);
   if (f.stack === "linea") return lineaVerdict(f);
   if (f.stack === "zksync") return zksyncVerdict(f);
+  if (f.stack === "blast") return blastVerdict(f);
   const t = f.l1.timestamp;
   const notes = [];
   if (f.feeVault) notes.push("This is a fee vault withdrawal: protocol revenue moving to L1, not a user's funds.");
@@ -83,6 +84,68 @@ export function verdict(f) {
     action: `OptimismPortal.proveWithdrawalTransaction(withdrawal ${tx}, game index, output root proof, storage proof)`,
     summary: f.proofs.length
       ? "Must be proven again: no earlier proof still counts. Anyone can prove it; the funds still go only to the recipient."
+      : "Ready to prove. Anyone can prove it; the funds go only to the withdrawal's recipient.",
+  };
+}
+
+/**
+ * Blast keeps the pre-fault-proof OptimismPortal (1.10.0) with an L2OutputOracle. A proof counts while its output is
+ * still the oracle's output at that index; finalizing needs the finalization period to pass after both the proof and
+ * that output. An ETH withdrawal is also a request in the ETH yield manager's queue, proven as `requestId`: it can be
+ * finalized once the queue has finalized that request, with the queue's checkpoint hint (OptimismPortal.sol and
+ * WithdrawalQueue.sol, verified source). Only one proof per withdrawal, unless its output was replaced.
+ */
+function blastVerdict(f) {
+  const t = f.l1.timestamp;
+  const notes = [];
+  if (f.feeVault) notes.push("This is a fee vault withdrawal: protocol revenue moving to L1, not a user's funds.");
+  if (f.usdb) notes.push("This is USDB. Finalizing does not pay it yet: Blast's bridge puts the DAI in its USD yield manager's queue, and only the recipient can claim it from there (Blast's bridge app shows the claim).");
+  const tx = `(${f.withdrawal.hash})`;
+  if (f.finalized) {
+    if (f.relay === "failed") {
+      return {
+        state: "RELAY_FAILED", eta: null, who: "anyone", notes,
+        action: `L1CrossDomainMessenger.relayMessage with the original message ${tx}`,
+        summary: "Finalized on L1, but the messenger's call to the recipient failed. The funds sit in the L1 messenger and anyone can replay the message.",
+      };
+    }
+    return { state: "FINALIZED", eta: null, who: null, action: null, notes, summary: "Finalized on L1. Nothing is left to do." };
+  }
+
+  const p = f.proven;
+  if (p && p.currentRoot === p.outputRoot) {
+    const period = f.config.maturitySec;
+    const opensAt = Math.max(p.provenAt, p.outputTimestamp) + period + 1;
+    const needsQueue = f.withdrawal.value > 0n;
+    const queued = !needsQueue || (f.queue && p.requestId > 0n && p.requestId <= f.queue.lastFinalizedRequestId);
+    if (t >= opensAt && queued) {
+      const hint = needsQueue ? f.queue.hint : 0n;
+      return {
+        state: "READY_TO_FINALIZE", eta: null, who: "anyone", notes, proof: { provenAt: p.provenAt },
+        action: `OptimismPortal.finalizeWithdrawalTransaction(hintId ${hint}, withdrawal ${tx})`,
+        summary: "Ready to finalize. Anyone can send the finalize transaction; the funds go to the withdrawal's recipient, never to the sender of the transaction.",
+      };
+    }
+    if (!queued) notes.push("Its ETH is a request in Blast's ETH yield manager queue, which the yield manager has not finalized yet. Blast finalizes the queue as ETH comes back from its yield providers; until then the withdrawal can't be finalized.");
+    return {
+      state: "WAITING_TO_FINALIZE", eta: queued ? opensAt : null, who: null, notes, proof: { provenAt: p.provenAt },
+      action: null,
+      summary: "Proven. Waiting for the one-day finalization period before anyone can finalize.",
+    };
+  }
+  if (p) notes.push("The output it was proven against was replaced on L1, so that proof no longer counts.");
+
+  if (!f.coverage.covered) {
+    return {
+      state: "WAITING_FOR_GAME", eta: t + f.config.cadenceSec, who: null, notes, action: null,
+      summary: "Waiting for the next output proposal on L1 to include this withdrawal. Then anyone can prove it.",
+    };
+  }
+  return {
+    state: "READY_TO_PROVE", eta: null, who: "anyone", notes,
+    action: `OptimismPortal.proveWithdrawalTransaction(withdrawal ${tx}, output index, output root proof, storage proof)`,
+    summary: p
+      ? "Must be proven again: its earlier proof no longer counts. Anyone can prove it; the funds still go only to the recipient."
       : "Ready to prove. Anyone can prove it; the funds go only to the withdrawal's recipient.",
   };
 }

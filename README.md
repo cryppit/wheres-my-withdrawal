@@ -3,17 +3,24 @@
 Paste the L2 transaction that started a withdrawal to Ethereum. It tells you, from public RPCs only:
 
 - whether the withdrawal is done, waiting (and until when), or missing a step;
-- which step is missing (prove or finalize on OP Mainnet and Base, claim on Arbitrum One, Robinhood Chain and Linea,
-  finalize on ZKsync Era) and the exact contract call;
-- who may take that step. On all six chains that is **anyone**, and the money still goes only to the withdrawal's
+- which step is missing (prove or finalize on the OP Stack chains and Blast, claim on Arbitrum One, Robinhood Chain and
+  Linea, finalize on ZKsync Era) and the exact contract call;
+- who may take that step. On all thirteen chains that is **anyone**, and the money still goes only to the withdrawal's
   recipient. On ZKsync Era a batch finalizer usually takes it without the owner doing anything;
 - who proved or claimed it, if someone else did. Third parties now prove and finish old withdrawals for others, and some
   then ask the owner for a tip. Nothing is owed: the funds arrive at the recipient either way.
 
 It never asks for keys, never connects a wallet and never signs anything.
 
-Supported now: **OP Mainnet** (including withdrawals started before the Bedrock upgrade of 6 June 2023), **Base**, **Arbitrum One** (Nitro withdrawals, since 31 Aug 2022), **Robinhood Chain**
-(since its mainnet, 1 Jul 2026), **Linea** and **ZKsync Era** (withdrawals through the ZKsync bridge).
+Supported now: **OP Mainnet** (including withdrawals started before the Bedrock upgrade of 6 June 2023), **Base**,
+**Unichain**, **Ink**, **Soneium**, **World Chain**, **Mode**, **Zora**, **Blast** (its own portal, below), **Arbitrum One**
+(Nitro withdrawals, since 31 Aug 2022), **Robinhood Chain** (since its mainnet, 1 Jul 2026), **Linea** and **ZKsync Era**
+(withdrawals through the ZKsync bridge).
+
+Blast keeps the OP Stack's older portal (1.10.0): withdrawals are proven against an L2OutputOracle output, finalize one
+day later, and only one proof per withdrawal counts. ETH withdrawals also pass through Blast's ETH yield manager:
+finalize needs the queue's checkpoint hint, which the check reads and puts in the call. USDB comes back as a DAI claim
+that only the recipient can collect after finalize, and the check says so.
 
 ## Use it
 
@@ -21,14 +28,15 @@ Node 22 or later, no dependencies.
 
 ```sh
 node cli.js 0x<L2 tx hash>                 # finds the chain itself
-node cli.js 0x<L2 tx hash> --chain base    # or name it: op, base, arb, robinhood, linea, zksync
+node cli.js 0x<L2 tx hash> --chain base    # or name it: op, base, unichain, ink, soneium, worldchain, mode, zora,
+                                           # blast, arb, robinhood, linea, zksync
 node cli.js 0x<L2 tx hash> --json          # every fact behind the answer
 npm test                                   # replays recorded real withdrawals, no network
 ```
 
 ## Build the prove step yourself (OP Stack)
 
-`node cli.js <L2 tx hash> --prove [--chain op|base] [--from 0x…]` builds the whole `proveWithdrawalTransaction` call
+`node cli.js <L2 tx hash> --prove [--chain op|base|unichain|ink|soneium|worldchain|mode|zora|blast] [--from 0x…]` builds the whole `proveWithdrawalTransaction` call
 from public data and rehearses it, read-only:
 
 - picks the newest dispute game of the respected type that is proper, not lost and covers the withdrawal (for super-root
@@ -36,6 +44,9 @@ from public data and rehearses it, read-only:
 - reads that L2 block and `eth_getProof` of `L2ToL1MessagePasser`, checks that the output root matches the game's claim
   and that the withdrawal is stored (pre-Bedrock withdrawals in their migrated form);
 - encodes the call and rehearses it with `eth_call` (and estimates its gas). Nothing is signed or sent.
+
+On Blast it proves against the newest L2OutputOracle output instead of a dispute game. It refuses to build a proof for a
+withdrawal that is already finalized (the portal would accept it and waste the gas) or, on Blast, already proven.
 
 Anyone can send the printed call (to the OptimismPortal, value 0, with that data) from their own wallet; the funds go
 only to the withdrawal's recipient. Whoever proves must also finalize it later (the portal keys proofs by sender), with

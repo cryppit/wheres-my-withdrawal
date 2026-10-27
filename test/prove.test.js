@@ -51,3 +51,18 @@ test("finalizeWithdrawalTransactionExternalProof (anyone finalizes with another 
     "0x43ca1c5000000000000000000000000000000000000000000000000000000000000000400000000000000000000000008fc7489af1fc446146b2a9a3ea6c91cf79ee12cc000000000000000000000000000000000000000000000000000000000001c6b2000000000000000000000000420000000000000000000000000000000000000700000000000000000000000025ace71c97b33cc4729cf772ae268934f7ab5fa1000000000000000000000000000000000000000000000000003fe0b6f90fc000000000000000000000000000000000000000000000000000000000000013f3c900000000000000000000000000000000000000000000000000000000000000c00000000000000000000000000000000000000000000000000000000000000029d764ad0bababababababababababababababababababababababababababababababababababababab0000000000000000000000000000000000000000000000",
   );
 });
+
+test("buildProve refuses a withdrawal that is already finalized (the portal would take the proof and waste the gas)", async () => {
+  const { readFileSync } = await import("node:fs");
+  const { buildProve } = await import("../src/prove.js");
+  const { replaying } = await import("../src/rpc.js");
+  const { CHAINS } = await import("../src/chains.js");
+  const fx = JSON.parse(readFileSync(new URL("../fixtures/op-finalized.json", import.meta.url)));
+  const finalized = "0x" + "0".repeat(63) + "1";
+  const l1 = async (method, params) => {
+    if (method === "eth_call" && params[0].data.startsWith("0xa14238e7")) return finalized; // finalizedWithdrawals(bytes32)
+    throw new Error(`unexpected L1 call ${method}`);
+  };
+  const r = await buildProve(CHAINS.op, fx.tx, { l1, l2: replaying(fx.store.l2) });
+  assert.equal(r.error, "already-finalized");
+});
