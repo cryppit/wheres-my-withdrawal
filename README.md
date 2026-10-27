@@ -26,6 +26,23 @@ node cli.js 0x<L2 tx hash> --json          # every fact behind the answer
 npm test                                   # replays recorded real withdrawals, no network
 ```
 
+## Build the prove step yourself (OP Stack)
+
+`node cli.js <L2 tx hash> --prove [--chain op|base] [--from 0x…]` builds the whole `proveWithdrawalTransaction` call
+from public data and rehearses it, read-only:
+
+- picks the newest dispute game of the respected type that is proper, not lost and covers the withdrawal (for super-root
+  games the portal checks `rootClaimByChainId`, so the proof is the chain's own output root);
+- reads that L2 block and `eth_getProof` of `L2ToL1MessagePasser`, checks that the output root matches the game's claim
+  and that the withdrawal is stored (pre-Bedrock withdrawals in their migrated form);
+- encodes the call and rehearses it with `eth_call` (and estimates its gas). Nothing is signed or sent.
+
+Anyone can send the printed call (to the OptimismPortal, value 0, with that data) from their own wallet; the funds go
+only to the withdrawal's recipient. Whoever proves must also finalize it later (the portal keys proofs by sender), with
+`finalizeWithdrawalTransaction`, once the proof is 7 days old and the game has resolved and passed its finality delay.
+Public L2 endpoints serve proofs only for recent blocks (mainnet.optimism.io: 10,000), which is why it proves against a
+recent game rather than an old resolved one; the proof stays valid after that window.
+
 ## How it decides (October 2026)
 
 OP Mainnet and Base changed their proof systems in 2026, and checks written for the 2024 layout get both wrong.
