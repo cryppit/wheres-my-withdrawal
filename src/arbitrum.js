@@ -5,6 +5,7 @@
 // block, like the OP reader.
 import { encodeCall, selector, topic, word, wordAt, uintAt, addressAt, boolAt, decodeBytes, decodeString, decodeWords, sameAddress } from "./abi.js";
 import { ARBITRUM } from "./chains.js";
+import { inBatches } from "./rpc.js";
 
 const L2_TO_L1_TX = topic("L2ToL1Tx(address,address,uint256,uint256,uint256,uint256,uint256,uint256,bytes)");
 const CLASSIC_L2_TO_L1 = topic("L2ToL1Transaction(address,address,uint256,uint256,uint256,uint256,uint256,uint256,uint256,bytes)");
@@ -248,7 +249,7 @@ async function findClaim(w, outbox, earliest, finBlock, archive) {
   for (let round = 0; !log && hi - lo + 1 > LOG_SPAN; round++) {
     const probes = [...new Set(Array.from({ length: PROBES }, (_, i) => lo + Math.floor(((hi - lo) * (i + 1)) / (PROBES + 1))))].filter((p) => p < hi);
     const ends = round === 0 ? [claimIn(lo, lo + LOG_SPAN - 1), claimIn(hi - LOG_SPAN + 1, hi)].map((p) => p.catch(() => null)) : [];
-    const [spent, found] = await Promise.all([Promise.all(probes.map(spentAt)), Promise.all(ends)]);
+    const [spent, found] = await Promise.all([inBatches(probes, spentAt), Promise.all(ends)]);
     log = found.find(Boolean) ?? null;
     const first = spent.indexOf(true);
     if (first >= 0) {

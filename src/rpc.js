@@ -5,18 +5,29 @@ export class RpcError extends Error {}
 
 const isRevert = (err) => err && (err.code === 3 || /revert/i.test(err.message ?? ""));
 
-export function makeRpc(urls, { fetch: doFetch = globalThis.fetch, timeoutMs = 20_000 } = {}) {
+// A free endpoint that answers 429 (too many requests) is asked again after these pauses before the next one is tried.
+const BUSY_PAUSES_MS = [1000, 2000];
+const pause = (ms) => new Promise((r) => setTimeout(r, ms));
+
+export function makeRpc(urls, { fetch: doFetch = globalThis.fetch, timeoutMs = 20_000, sleep = pause } = {}) {
   let id = 0;
   return async function call(method, params) {
     const problems = [];
     for (const url of urls) {
       try {
-        const res = await doFetch(url, {
-          method: "POST",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({ jsonrpc: "2.0", id: ++id, method, params }),
-          signal: AbortSignal.timeout(timeoutMs),
-        });
+        const post = () =>
+          doFetch(url, {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({ jsonrpc: "2.0", id: ++id, method, params }),
+            signal: AbortSignal.timeout(timeoutMs),
+          });
+        let res = await post();
+        for (const ms of BUSY_PAUSES_MS) {
+          if (res.status !== 429) break;
+          await sleep(ms);
+          res = await post();
+        }
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const body = await res.json();
         // A revert is an answer, not an outage: the next endpoint would say the same.
@@ -29,6 +40,13 @@ export function makeRpc(urls, { fetch: doFetch = globalThis.fetch, timeoutMs = 2
     }
     throw new RpcError(`${method} failed on every endpoint (${problems.join("; ")})`);
   };
+}
+
+/** Calls f on each item, a few at a time: the free archive endpoints answer 429 to fifteen history calls at once. */
+export async function inBatches(items, f, size = 4) {
+  const out = [];
+  for (let i = 0; i < items.length; i += size) out.push(...(await Promise.all(items.slice(i, i + size).map(f))));
+  return out;
 }
 
 const key = (method, params) => `${method} ${JSON.stringify(params)}`;

@@ -7,6 +7,7 @@
 // block, like the other readers.
 import { encodeCall, selector, topic, word, wordAt, uintAt, addressAt, boolAt, decodeBytes, decodeString, sameAddress } from "./abi.js";
 import { ZKSYNC } from "./chains.js";
+import { inBatches } from "./rpc.js";
 
 const L1_MESSAGE_SENT = topic("L1MessageSent(address,bytes32,bytes)");
 // The three message formats the L1Nullifier accepts (_parseL2WithdrawalMessage), told apart by their first 4 bytes.
@@ -209,7 +210,7 @@ async function findFinalizer(f, chain, finBlock, l1, view) {
   let hi = finBlock; // finalized here
   while (lo < hi) {
     const probes = [...new Set([1, 2, 3].map((i) => lo + Math.floor(((hi - lo) * i) / 4)))].filter((p) => p < hi);
-    const done = await Promise.all(probes.map(doneAt));
+    const done = await inBatches(probes, doneAt);
     const first = done.indexOf(true);
     if (first >= 0) {
       hi = probes[first];

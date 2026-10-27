@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Usage: node cli.js <L2 tx hash> [--chain op|base|unichain|ink|soneium|worldchain|mode|zora|arb|robinhood|linea|zksync] [--index n] [--json]
+// Usage: node cli.js <L2 tx hash> [--chain op|base|unichain|ink|soneium|worldchain|mode|zora|blast|arb|robinhood|linea|zksync] [--index n] [--json]
 //        node cli.js <OP Stack L2 tx hash> --prove [--chain op] [--from 0x…] [--json]   build and rehearse the prove call
 //        node cli.js <L2 tx hash> --claim --chain arb|robinhood|linea [--from 0x…] [--json]   build and rehearse the claim
 import { check } from "./src/check.js";
