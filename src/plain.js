@@ -25,6 +25,7 @@ export function plainNext(r) {
   const now = f.l1.timestamp;
   const stack = chain.stack;
   const onlyTo = `Anyone can send it, and the money can only go to ${to}.`;
+  const onlyThere = "Anyone can send it; the money can only go to that address.";
   // OP Stack chains wait 7 days between prove and finalize; Blast's oracle sets its own period (one day).
   const wait = stack === "blast" ? days(f.config.maturitySec) : "7 days";
   const usdbClaim = f.usdb ? [`This is USDB: after finalize, only ${to} can claim the DAI, from Blast's bridge app.`] : [];
@@ -93,7 +94,7 @@ export function plainNext(r) {
         headline: "Your withdrawal is proven. Now it waits out the safety period.",
         steps: [
           "Step 1 of 2 (prove) is done.",
-          `Step 2 of 2 (finalize) opens ${when(v.eta, now)}. Then one transaction pays the money to ${to}. ${onlyTo}`,
+          `Step 2 of 2 (finalize) opens ${when(v.eta, now)}. Then one transaction pays the money to ${to}. ${onlyThere}`,
           "Nothing to do until then. If someone else sent the first step, you owe them nothing.",
           ...usdbClaim,
           ...old,
@@ -136,7 +137,7 @@ export function plainNext(r) {
           ...(v.eta ? [`It should be ready about ${when(v.eta, now)}.`] : []),
           stack === "zksync"
             ? `After that, one last transaction (finalize) pays the money to ${to}; ZKsync's own service usually sends it.`
-            : `After that, one last transaction (the claim) pays the money to ${to}. ${onlyTo}`,
+            : `After that, one last transaction (the claim) pays the money to ${to}. ${onlyThere}`,
         ],
       };
 

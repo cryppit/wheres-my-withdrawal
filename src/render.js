@@ -30,7 +30,8 @@ export function formatUnits(v, decimals) {
   const whole = s.slice(0, s.length - decimals);
   const frac = s.slice(s.length - decimals).replace(/0+$/, "");
   // Eight decimals, unless that would round a dust amount (a 1-wei withdrawal) down to zero.
-  return frac ? `${whole}.${/^0{8}/.test(frac) ? frac : frac.slice(0, 8)}` : whole;
+  const grouped = whole.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+  return frac ? `${grouped}.${/^0{8}/.test(frac) ? frac : frac.slice(0, 8)}` : grouped;
 }
 
 /** Name an address: a known party, the withdrawal's own sender or recipient, or a third party. */
@@ -70,7 +71,7 @@ export function renderText(r) {
   const { chain, facts: f, verdict: v } = r;
   const lines = [
     `${chain.name} withdrawal ${f.l2.txHash}${f.l2.withdrawals > 1 ? ` (#${f.l2.index} of ${f.l2.withdrawals})` : ""}`,
-    `  started ${utc(f.l2.timestamp)}, L2 block ${f.l2.blockNumber}`,
+    `  started ${utc(f.l2.timestamp)}, block ${f.l2.blockNumber.toLocaleString("en-US")} on ${chain.name}`,
     `  carries ${formatAmount(f.asset)}${f.asset.to ? ` to ${f.asset.to}` : ""}`,
     "",
     `${LABEL[v.state]}  ${v.summary}`,
@@ -84,6 +85,6 @@ export function renderText(r) {
   if (v.action) lines.push(`  call: ${v.action}`);
   if (v.action && f.proof) lines.push(`  proof: ${proofLine(f)}; --json prints them`);
   for (const n of v.notes) lines.push(`  note: ${n}`);
-  lines.push("", `Read from public RPCs at finalized Ethereum block ${f.l1.block} (${utc(f.l1.timestamp)}). Nothing was signed.`);
+  lines.push("", `Read from public blockchain data at Ethereum block ${f.l1.block.toLocaleString("en-US")} (${utc(f.l1.timestamp)}). Nothing was signed.`);
   return lines.join("\n");
 }

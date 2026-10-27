@@ -4,13 +4,13 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Where's My Withdrawal</title>
-<meta name="description" content="Paste an OP Mainnet, Base, Arbitrum One, Robinhood Chain, Linea or ZKsync Era withdrawal: see what step is missing, when it opens and who can do it. Read-only, no keys.">
+<meta name="description" content="Stuck withdrawal from Base, Arbitrum, OP Mainnet, Blast, Linea, ZKsync or another network back to Ethereum? Paste it: see what step is missing, when it opens and who can do it. Free, read-only, no keys.">
 <link rel="icon" href="icons/favicon-32.png" sizes="32x32" type="image/png">
 <link rel="icon" href="icons/favicon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <meta property="og:type" content="website">
 <meta property="og:title" content="Where's My Withdrawal: find the missing step">
-<meta property="og:description" content="Paste an L2 withdrawal (OP Mainnet, Base, Arbitrum One, Robinhood Chain, Linea, ZKsync Era): see what step is missing, when it opens and who can finish it. Free, read-only, by Cryppit.">
+<meta property="og:description" content="Stuck withdrawal back to Ethereum, from 13 networks including Base, Arbitrum, OP Mainnet, Blast, Linea and ZKsync? See what step is missing, when it opens and who can finish it. Free, read-only, by Cryppit.">
 <meta property="og:url" content="https://cryppit.github.io/wheres-my-withdrawal/">
 <meta property="og:image" content="https://cryppit.github.io/wheres-my-withdrawal/icons/og.png">
 <meta property="og:image:width" content="1200">
@@ -117,7 +117,7 @@
   .more-l2s img { width: 22px; height: 22px; padding: 3px; border-radius: 50%; background: radial-gradient(circle at 35% 30%, #18204f, #070b22 70%); box-shadow: inset 0 0 0 1px rgba(221, 242, 74, 0.45); vertical-align: middle; margin-right: -4px; }
   .more-l2s img[src$="soneium.svg"], .more-l2s img[src$="worldchain.svg"] { background: #f3efe4; }
 
-  /* The art: the six rollups on the left, light routes climbing into a glowing Ethereum coin. */
+  /* The art: the first six rollups on the left, light routes climbing into a glowing Ethereum coin. */
   .hero-art { position: relative; min-height: 430px; border-radius: 24px; overflow: hidden; background: radial-gradient(closest-side at 75% 50%, rgba(143, 180, 255, 0.25), transparent 70%), url(art/withdrawal.jpg) center / cover no-repeat; box-shadow: inset 0 0 0 1px rgba(143, 180, 255, 0.2), 0 40px 120px -50px rgba(42, 59, 214, 0.8); }
   .hero-art::after { content: ""; position: absolute; inset: 0; background: radial-gradient(120% 90% at 50% 50%, transparent 40%, var(--deep) 100%); pointer-events: none; }
   .lines { position: absolute; inset: 6% 6%; width: 88%; height: 88%; z-index: 1; overflow: visible; }
@@ -226,13 +226,13 @@
       <p class="chip"><span>‹/›</span> Open source · MIT · Read-only</p>
       <h1>Where's My <span class="hl">Withdrawal</span></h1>
       <p class="tagline">Find the missing step.</p>
-      <p class="lede">Paste the transaction that started your withdrawal from an L2 to Ethereum. See whether it is done, what step is missing, when it opens, and who can take it, read from Ethereum itself.</p>
+      <p class="lede">Moving money from Base, Arbitrum, OP Mainnet or another network back to Ethereum? Paste the transaction that started it. See whether it is done, what step is missing, when it opens, and who can take it, read from Ethereum itself.</p>
       <p class="ctas"><a class="btn lime-btn" href="#check">Check a withdrawal →</a><a class="btn ghost-btn" href="https://github.com/cryppit/wheres-my-withdrawal" target="_blank" rel="noopener noreferrer">View on GitHub</a></p>
       <dl class="stats">
-        <div><dt>13 rollups</dt><dd>to Ethereum</dd></div>
+        <div><dt>13 networks</dt><dd>to Ethereum</dd></div>
         <div><dt>0 keys</dt><dd>nothing to sign</dd></div>
         <div><dt>MIT</dt><dd>open source</dd></div>
-        <div><dt>139 tests</dt><dd>on recorded data</dd></div>
+        <div><dt>146 tests</dt><dd>on recorded data</dd></div>
       </dl>
       <p class="more-l2s"><span>Also</span><img src="logos/unichain.svg" alt="" width="22" height="22">Unichain <img src="logos/ink.svg" alt="" width="22" height="22">Ink <img src="logos/soneium.svg" alt="" width="22" height="22">Soneium <img src="logos/worldchain.svg" alt="" width="22" height="22">World Chain <img src="logos/mode.svg" alt="" width="22" height="22">Mode <img src="logos/zora.svg" alt="" width="22" height="22">Zora <img src="logos/blast.svg" alt="" width="22" height="22">Blast</p>
     </div>
@@ -262,17 +262,18 @@
     <aside class="panel" id="check">
       <h2>Check a withdrawal</h2>
       <form id="f">
-        <label for="tx">L2 transaction hash</label>
+        <label for="tx">Transaction hash (the one that started the withdrawal)</label>
         <input id="tx" name="tx" placeholder="0x… the transaction that started it" autocomplete="off" spellcheck="false">
         <select id="chain" aria-label="Chain"><option value="auto">Find the chain for me</option><optgroup label="OP Stack"><option value="op">OP Mainnet</option><option value="base">Base</option><option value="unichain">Unichain</option><option value="ink">Ink</option><option value="soneium">Soneium</option><option value="worldchain">World Chain</option><option value="mode">Mode</option><option value="zora">Zora</option><option value="blast">Blast</option></optgroup><optgroup label="Arbitrum"><option value="arb">Arbitrum One</option><option value="robinhood">Robinhood Chain</option></optgroup><optgroup label="Other rollups"><option value="linea">Linea</option><option value="zksync">ZKsync Era</option></optgroup></select>
         <button class="go" id="go" type="submit">Check withdrawal →</button>
       </form>
-      <p class="hint">Your browser asks public RPCs directly, at the latest finalized Ethereum block. No wallet, no keys, nothing signed.</p>
+      <p class="hint">Your browser reads the public blockchain data directly. No wallet, no keys, nothing signed.</p>
       <h3>Real withdrawals</h3>
       <ul class="examples">
         <li><button type="button" data-tx="0x6dd4496a80c39a43a34d41d84e38ff7f9f6d3b3daf312c5e01f3aa325d1ed970"><img src="logos/op.svg" alt="" width="22" height="22"><span>0.076 ETH from 2023</span><span class="ex-tag">OP Mainnet</span></button></li>
         <li><button type="button" data-tx="0xafb31a144d76abfe507df920dc222f2675a562839d8639e9cbace056ab598430"><img src="logos/op.svg" alt="" width="22" height="22"><span>Proven by a third party</span><span class="ex-tag">OP Mainnet</span></button></li>
         <li><button type="button" data-tx="0x95e78c5563149643456198b291f78f6bcfa78488268f440ab88e3dfc59bcb46d"><img src="logos/base.svg" alt="" width="22" height="22"><span>A Base withdrawal</span><span class="ex-tag">Base</span></button></li>
+        <li><button type="button" data-tx="0x3c26872e60937e7612b3b56e105ffd85b89899870ac24ce318490c0980a00597"><img src="logos/blast.svg" alt="" width="22" height="22"><span>A Blast withdrawal</span><span class="ex-tag">Blast</span></button></li>
         <li><button type="button" data-tx="0xb1eece7b4253c1f04bf25bf469a8def4dec6c74d61b7f912470f3d40d06361c1"><img src="logos/arb.svg" alt="" width="22" height="22"><span>Claimed by a third party</span><span class="ex-tag">Arbitrum</span></button></li>
         <li><button type="button" data-tx="0x1cf329e6f0abb246c8c98fe3de832ed826fa6c16f66384bfc1862e65452fb396"><img src="logos/robinhood.svg" alt="" width="22" height="22"><span>0.028 ETH, claimed</span><span class="ex-tag">Robinhood</span></button></li>
         <li><button type="button" data-tx="0x6ee41de9db9157560a67fb52a8047776dd225a4cc3782cb7c9fba27830bc5b88"><img src="logos/linea.svg" alt="" width="22" height="22"><span>Unclaimed since 2024</span><span class="ex-tag">Linea</span></button></li>
@@ -286,11 +287,11 @@
   <section class="how" id="how">
     <div class="flow-card">
       <h2>How a check works</h2>
-      <p class="muted">From your L2 transaction to the step that is missing, read from public RPCs only.</p>
+      <p class="muted">From your transaction to the step that is missing, read from public blockchain data only.</p>
       <ol class="flow">
-        <li><span class="fi i-paste" aria-hidden="true"></span><b>1. Paste</b><span>the L2 transaction that started it</span></li>
-        <li><span class="fi i-find" aria-hidden="true"></span><b>2. Find</b><span>which rollup it is on, and the withdrawal inside it</span></li>
-        <li><span class="fi i-read" aria-hidden="true"></span><b>3. Read</b><span>Ethereum: the proof, the dispute game, the outbox or the batch</span></li>
+        <li><span class="fi i-paste" aria-hidden="true"></span><b>1. Paste</b><span>the transaction that started it</span></li>
+        <li><span class="fi i-find" aria-hidden="true"></span><b>2. Find</b><span>which network it is on, and the withdrawal inside it</span></li>
+        <li><span class="fi i-read" aria-hidden="true"></span><b>3. Read</b><span>Ethereum itself: what has been proven, confirmed and paid</span></li>
         <li><span class="fi i-step" aria-hidden="true"></span><b>4. Name</b><span>the missing step, when it opens, and the exact call</span></li>
         <li><span class="fi i-done" aria-hidden="true"></span><b>5. Finish</b><span>anyone can send it; the money only goes to the recipient</span></li>
       </ol>
@@ -308,7 +309,7 @@
     <article class="feat">
       <span class="fx" aria-hidden="true"><img src="logos/eth.svg" alt="" width="32" height="32"></span>
       <h3>Anyone can finish it</h3>
-      <p>On OP Mainnet and Base, proving and finalizing are open to any address; on Arbitrum One, Robinhood Chain and Linea, so is the claim; on ZKsync Era, so is the finalize step, which ZKsync's own finalizer usually takes. The money only ever goes to the recipient.</p>
+      <p>On OP Mainnet, Base, Unichain, Ink, Soneium, World Chain, Mode, Zora and Blast, anyone can send the prove and finalize steps; on Arbitrum One, Robinhood Chain and Linea, anyone can send the claim; on ZKsync Era, anyone can send the finalize step, which ZKsync's own service usually sends for you. The money only ever goes to the recipient.</p>
       <p class="tags"><span>Prove</span><span>Finalize</span><span>Claim</span><span>Exact call shown</span></p>
     </article>
     <article class="feat">
@@ -320,25 +321,25 @@
     <article class="feat">
       <span class="fx fx-code" aria-hidden="true"></span>
       <h3>Read from Ethereum</h3>
-      <p>Your browser asks public RPCs directly, pinned to the latest finalized Ethereum block, and every wait is read live from the contracts. No wallet, no keys, nothing signed, nothing stored.</p>
-      <p class="tags"><span>MIT</span><span>No keys</span><span>No server</span><span>139 tests</span></p>
+      <p>Your browser reads the public blockchain data directly, from the latest settled Ethereum block, and every waiting time is read live from Ethereum. No wallet, no keys, nothing signed, nothing stored.</p>
+      <p class="tags"><span>MIT</span><span>No keys</span><span>No server</span><span>146 tests</span></p>
     </article>
   </section>
 
   <section class="states">
     <h2>What it tells apart</h2>
-    <p class="muted">Every withdrawal gets one of these, from Ethereum's own contracts.</p>
+    <p class="muted">Every withdrawal gets one of these, read from Ethereum itself.</p>
     <ul class="state-grid">
       <li class="st ok"><b>Done</b><span>Finalized or claimed; the money arrived.</span></li>
       <li class="st warn"><b>Ready</b><span>Ready to prove, finalize or claim: anyone, now.</span></li>
-      <li class="st info"><b>Waiting</b><span>A window or batch still running, with when it opens.</span></li>
-      <li class="st bad"><b>Needs a replay</b><span>The final message failed and must be sent again.</span></li>
+      <li class="st info"><b>Waiting</b><span>A safety wait still running, with when it ends.</span></li>
+      <li class="st bad"><b>Needs resending</b><span>The final payment failed and must be sent again.</span></li>
     </ul>
   </section>
 
   <footer>
     <p>Open source (MIT): <a href="https://github.com/cryppit/wheres-my-withdrawal" target="_blank" rel="noopener noreferrer">github.com/cryppit/wheres-my-withdrawal</a> · by <a href="https://cryppit.near.page/">Cryppit</a></p>
-    <p class="muted">Independent project, not affiliated with Ethereum, Optimism, Base, Arbitrum, Robinhood, Linea or ZKsync. It never holds keys or signs anything. Chain logos: web3icons (MIT).</p>
+    <p class="muted">Independent project, not affiliated with Ethereum or any of the 13 networks it checks. It never holds keys or signs anything. Chain logos: web3icons (MIT).</p>
   </footer>
 </main>
 <script type="module">
@@ -349,7 +350,7 @@
 
   const $ = (id) => document.getElementById(id);
   const PILL = {
-    FINALIZED: ["Done", "s-done"], RELAY_FAILED: ["Needs a replay", "s-bad"], READY_TO_FINALIZE: ["Ready to finalize", "s-ready"],
+    FINALIZED: ["Done", "s-done"], RELAY_FAILED: ["Needs resending", "s-bad"], READY_TO_FINALIZE: ["Ready to finalize", "s-ready"],
     WAITING_TO_FINALIZE: ["Waiting", "s-wait"], READY_TO_PROVE: ["Ready to prove", "s-ready"], WAITING_FOR_GAME: ["Waiting", "s-wait"],
     CLAIMED: ["Done", "s-done"], READY_TO_CLAIM: ["Ready to claim", "s-ready"], WAITING_FOR_CONFIRMATION: ["Waiting", "s-wait"],
     WAITING_FOR_FINALIZATION: ["Waiting", "s-wait"], WAITING_FOR_BATCH: ["Waiting", "s-wait"],
@@ -442,7 +443,7 @@
     const dev = el("dl");
     if (v.action) row(dev, "The call", v.action, true);
     if (v.action && f.proof) row(dev, "Proof", `${proofLine(f)}: ${f.proof.hashes.join(" ")}`, true);
-    row(dl, "Started", `${utc(f.l2.timestamp)}, L2 block ${f.l2.blockNumber}`);
+    row(dl, "Started", `${utc(f.l2.timestamp)}, block ${f.l2.blockNumber.toLocaleString("en-US")} on ${chain.name}`);
     row(dl, "Transaction", link(chain.explorer + f.l2.txHash, f.l2.txHash));
     card.append(dl);
     for (const n of v.notes) card.append(el("p", "note", n));
@@ -451,7 +452,7 @@
       d.append(el("summary", null, "For developers: the exact call"), dev);
       card.append(d);
     }
-    card.append(el("p", "foot", `Read from public RPCs at finalized Ethereum block ${f.l1.block} (${utc(f.l1.timestamp)}). Nothing was signed.`));
+    card.append(el("p", "foot", `Read from public blockchain data at Ethereum block ${f.l1.block.toLocaleString("en-US")} (${utc(f.l1.timestamp)}). Nothing was signed.`));
     out.append(card);
     if (animate) play(steps);
   }
@@ -469,7 +470,7 @@
       show(r);
       r.extras?.then((full) => { if (me === runs) show(full, false); });
     }
-    catch (e) { show({ error: "rpc", message: `The public RPCs did not answer (${e.message}). Try again in a minute.` }); }
+    catch (e) { show({ error: "rpc", message: `The public data sources did not answer. Try again in a minute. (${e.message})` }); }
     finally { $("go").disabled = false; }
   }
 

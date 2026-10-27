@@ -51,7 +51,7 @@ test("the full check on it: ready to prove, by anyone, with a note on why bridge
   assert.equal(r.facts.withdrawal.hash, "0xd4b45b9d65cd6887388bc90334a922cf732554ec1acd0f244da2f873661ee3bc");
   assert.equal(r.facts.asset.to, "0xd355d58dc7d94228add92b38903bdfe008e12451");
   assert.equal(r.facts.legacy, true);
-  assert.match(renderText(r), /before OP Mainnet's Bedrock upgrade/);
+  assert.match(renderText(r), /before OP Mainnet's big upgrade of 6 June 2023/);
 });
 
 test("DERIVED, not recorded: had the old message been relayed (before or after the upgrade), it reads as done", async () => {

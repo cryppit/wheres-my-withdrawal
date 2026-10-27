@@ -70,7 +70,7 @@ test("Blast: proven, but the yield manager has not finalized its ETH request yet
   const v = verdict(base({ proven: proof({ requestId: 48800n }), queue: { lastFinalizedRequestId: 48718n, hint: 0n } }));
   assert.equal(v.state, "WAITING_TO_FINALIZE");
   assert.equal(v.eta, null);
-  assert.match(v.notes.join(" "), /yield manager/);
+  assert.match(v.notes.join(" "), /payout queue/);
 });
 
 test("Blast: a token withdrawal (no ETH) needs no hint", () => {

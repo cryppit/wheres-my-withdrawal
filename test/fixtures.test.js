@@ -196,7 +196,7 @@ test("Linea, 138,384 USDT through the canonical token bridge, finalized and not 
   assert.equal(r.facts.asset.decimals, 6);
   assert.equal(r.facts.asset.to, "0x22740deba78d5a0c24c58c740e3715ec29de1bfa");
   assert.equal(r.facts.proof.rootConfirmed, true);
-  assert.match(renderText(r), /138384\.480511 USDT/);
+  assert.match(renderText(r), /138,384\.480511 USDT/);
 });
 
 test("Linea, Mar 2024, 0.05 ETH claimed by unlost.eth on 24 Oct 2026: done, and the claimer is named", async () => {
@@ -266,7 +266,7 @@ test("ZKsync, finalized automatically through the WithdrawalFinalizer contract",
   assert.equal(r.verdict.state, "FINALIZED");
   assert.equal(r.facts.finalizedBy, "nullifier");
   assert.equal(r.verdict.claim.via, "0xf8a16864d8de145a266a534174305f881ee2315e");
-  assert.ok(r.verdict.notes.some((n) => /WithdrawalFinalizer/.test(n)));
+  assert.ok(r.verdict.notes.some((n) => /automatic service/.test(n)));
   assert.ok(!r.verdict.notes.some((n) => /owed/.test(n)));
 });
 

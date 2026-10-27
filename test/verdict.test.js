@@ -81,7 +81,7 @@ test("Base game: ETA comes from the game's expectedResolution", () => {
 test("the only proof is against a retired game: must be proven again", () => {
   const v = verdict(base({ proofs: [{ submitter: "0x" + "4".repeat(40), provenAt: T - 400 * DAY, game: game({ proper: false, retired: true, claimValid: false }) }] }));
   assert.equal(v.state, "READY_TO_PROVE");
-  assert.ok(v.notes.some((n) => /retired/.test(n)));
+  assert.ok(v.notes.some((n) => /upgrade cancelled/.test(n)));
 });
 
 test("one dead proof and one live one: the live one decides", () => {
@@ -96,7 +96,7 @@ test("a proof sent in the same second the game was created does not count", () =
 });
 
 test("fee-vault withdrawals are labelled as protocol revenue", () => {
-  assert.ok(verdict(base({ feeVault: true })).notes.some((n) => /fee vault/i.test(n)));
+  assert.ok(verdict(base({ feeVault: true })).notes.some((n) => /fee withdrawal: the network moving its own earnings/i.test(n)));
 });
 
 // Arbitrum One: L2ToL1Tx, then a BoLD assertion that includes it is confirmed, then anyone claims it from the Outbox.
@@ -138,7 +138,7 @@ test("Arbitrum: window over but not confirmed yet: due now, and anyone may confi
   const v = verdict(arb({ covering: { assertion: "0x" + "b".repeat(64), createdAtBlock: BLOCK - 46_000, deadlineBlock: BLOCK - 182 } }));
   assert.equal(v.state, "WAITING_FOR_CONFIRMATION");
   assert.equal(v.eta, T);
-  assert.ok(v.notes.some((n) => /confirmAssertion/.test(n)));
+  assert.ok(v.notes.some((n) => /usually happens within the hour/.test(n)));
 });
 
 test("Robinhood Chain: window over but not confirmed yet: due now, and only its whitelisted validators may confirm", () => {
@@ -149,7 +149,7 @@ test("Robinhood Chain: window over but not confirmed yet: due now, and only its 
   }));
   assert.equal(v.state, "WAITING_FOR_CONFIRMATION");
   assert.equal(v.eta, T);
-  assert.ok(v.notes.some((n) => /only (its|the rollup's) whitelisted validators may confirm/.test(n)));
+  assert.ok(v.notes.some((n) => /network's own operators confirm it/.test(n)));
   assert.ok(v.notes.some((n) => /about every 30 minutes/.test(n)));
   assert.ok(!v.notes.some((n) => /anyone may confirm/.test(n)));
 });
@@ -207,7 +207,7 @@ test("Arbitrum: ready, but the L2 RPC's proof does not check out on L1: still re
   const proof = { size: 167_100, leaf: "0x" + "9".repeat(64), root: "0x" + "8".repeat(64), hashes: ["0x" + "7".repeat(64)], leafMatches: false, rootConfirmed: false };
   const v = verdict(arb({ confirmed: { assertion: "0x" + "a".repeat(64), l2Block: 501_000_000, sendCount: 167_100, covered: true }, covering: null, proof }));
   assert.equal(v.state, "READY_TO_CLAIM");
-  assert.ok(v.notes.some((n) => /proof .* did not check out/.test(n)));
+  assert.ok(v.notes.some((n) => /didn't check out/.test(n)));
 });
 
 // Linea: MessageSent on L2, then the L1 rollup finalizes that L2 block, then anyone claims on L1. Nothing auto-claims.
@@ -284,7 +284,7 @@ test("Linea: claimed, claimer not found: done, and it says so", () => {
 
 test("Linea: a fee paid on L2 goes to whoever claims", () => {
   const v = verdict(lin({ withdrawal: { ...lin().withdrawal, fee: 10n ** 15n } }));
-  assert.ok(v.notes.some((n) => /0\.001 ETH fee .* whoever sends the claim/.test(n)));
+  assert.ok(v.notes.some((n) => /0\.001 ETH fee .* Whoever sends the claim gets it/.test(n)));
 });
 
 test("Linea: unclaimed after 90 days: the bridge app no longer lists it", () => {
@@ -297,10 +297,10 @@ test("Linea: the daily L1 limit would be exceeded: the claim reverts until the p
   const rateLimit = { limitWei: 10_000n * 10n ** 18n, usedWei: 9_999n * 10n ** 18n, periodEnd: T + 3600 };
   const v = verdict(lin({ withdrawal: { ...lin().withdrawal, value: 5n * 10n ** 18n }, asset: { ...lin().asset, amount: 5n * 10n ** 18n }, config: { ...lin().config, rateLimit } }));
   assert.equal(v.state, "READY_TO_CLAIM");
-  assert.ok(v.notes.some((n) => /daily limit/.test(n)));
+  assert.ok(v.notes.some((n) => /claimed per day/.test(n)));
   // a new period starts once periodEnd has passed, so the used amount no longer counts
   const later = verdict(lin({ withdrawal: { ...lin().withdrawal, value: 5n * 10n ** 18n }, config: { ...lin().config, rateLimit: { ...rateLimit, periodEnd: T - 1 } } }));
-  assert.ok(!later.notes.some((n) => /daily limit/.test(n)));
+  assert.ok(!later.notes.some((n) => /claimed per day/.test(n)));
 });
 
 test("Linea: claims paused on L1: still ready, with a warning", () => {
@@ -311,7 +311,7 @@ test("Linea: claims paused on L1: still ready, with a warning", () => {
 
 test("Linea: ready, but the rebuilt proof's root is not on L1: still ready, with a warning", () => {
   const v = verdict(lin({ proof: { ...lin().proof, rootConfirmed: false } }));
-  assert.ok(v.notes.some((n) => /proof .* did not check out/.test(n)));
+  assert.ok(v.notes.some((n) => /didn't check out/.test(n)));
 });
 
 // ZKsync Era: an L2-to-L1 log in batch N; once N is executed on L1 anyone can finalize on the L1Nullifier. Most are
@@ -347,7 +347,7 @@ test("ZKsync: batch executed, not finalized: anyone can finalize, and it says mo
 test("ZKsync: ready, but a dry run of the call on L1 failed: still ready, with a warning", () => {
   const v = verdict(zk({ proof: { ...zk().proof, simulated: false } }));
   assert.equal(v.state, "READY_TO_FINALIZE");
-  assert.ok(v.notes.some((n) => /dry run/.test(n)));
+  assert.ok(v.notes.some((n) => /test run/.test(n)));
 });
 
 test("ZKsync: batch committed, not executed: waiting, ETA from the latest executed batch's commit-to-execute time", () => {
@@ -375,7 +375,7 @@ test("ZKsync: finalized by the automatic finalizer: done, and it is named as suc
   assert.equal(v.state, "FINALIZED");
   assert.equal(v.who, null);
   assert.deepEqual(v.claim, claim);
-  assert.ok(v.notes.some((n) => /WithdrawalFinalizer/.test(n)));
+  assert.ok(v.notes.some((n) => /automatic service/.test(n)));
   assert.ok(!v.notes.some((n) => /owed/.test(n)));
 });
 

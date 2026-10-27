@@ -3,11 +3,11 @@
 
 /** Each stack's stops, and for each verdict state how far along it is: the index of the stop it is at and how. */
 const STACKS = {
-  op: ["Started on L2", "Prove", "Challenge window", "Finalize on Ethereum"],
-  blast: ["Started on L2", "Prove", "Challenge window", "Finalize on Ethereum"],
-  arbitrum: ["Started on L2", "Confirmed on Ethereum", "Claim"],
-  linea: ["Started on L2", "Finalized on Ethereum", "Claim"],
-  zksync: ["Started on L2", "Batch executed on Ethereum", "Finalize"],
+  op: ["Started", "Prove", "Safety wait", "Finalize on Ethereum"],
+  blast: ["Started", "Prove", "Safety wait", "Finalize on Ethereum"],
+  arbitrum: ["Started", "Confirmed on Ethereum", "Claim"],
+  linea: ["Started", "Confirmed on Ethereum", "Claim"],
+  zksync: ["Started", "Confirmed on Ethereum", "Finalize"],
 };
 
 /** [index of the stop the withdrawal is at, its state there]; every stop before it is done, every one after not reached. */

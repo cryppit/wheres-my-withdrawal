@@ -9,11 +9,11 @@ const DEFENDER_WINS = 2;
 /** Why a proof no longer counts, or null if it still does (OptimismPortal2.checkWithdrawal and AnchorStateRegistry rules). */
 function deadReason(p) {
   const g = p.game;
-  if (g.retired) return "its dispute game was retired by an upgrade";
-  if (g.blacklisted) return "its dispute game was blacklisted";
-  if (g.status === CHALLENGER_WINS) return "its dispute game was lost by the proposer";
-  if (!g.proper) return "its dispute game is no longer valid";
-  if (p.provenAt <= g.createdAt) return "it was sent in the same block the game was created";
+  if (g.retired) return "a network upgrade cancelled the state report it was checked against";
+  if (g.blacklisted) return "the state report it was checked against was thrown out";
+  if (g.status === CHALLENGER_WINS) return "the state report it was checked against was proven wrong";
+  if (!g.proper) return "the state report it was checked against no longer counts";
+  if (p.provenAt <= g.createdAt) return "it was sent too early, in the same moment as the state report";
   return null;
 }
 
@@ -32,8 +32,8 @@ export function verdict(f) {
   if (f.stack === "blast") return blastVerdict(f);
   const t = f.l1.timestamp;
   const notes = [];
-  if (f.feeVault) notes.push("This is a fee vault withdrawal: protocol revenue moving to L1, not a user's funds.");
-  if (f.legacy) notes.push("This withdrawal started before OP Mainnet's Bedrock upgrade (6 June 2023). The upgrade carried it over as a new-style withdrawal, which is why bridge apps don't list it. It is finished the same way as any other: prove, wait 7 days, finalize.");
+  if (f.feeVault) notes.push("This is a fee withdrawal: the network moving its own earnings to Ethereum, not a person's money.");
+  if (f.legacy) notes.push("This withdrawal started before OP Mainnet's big upgrade of 6 June 2023, which is why bridge apps don't show it. It still finishes the normal way: prove, wait 7 days, finalize.");
   const tx = `(${f.withdrawal.hash})`;
 
   if (f.finalized) {
@@ -41,16 +41,16 @@ export function verdict(f) {
       return {
         state: "RELAY_FAILED", eta: null, who: "anyone", notes,
         action: `L1CrossDomainMessenger.relayMessage with the original message ${tx}`,
-        summary: "Finalized on L1, but the messenger's call to the recipient failed. The funds sit in the L1 messenger and anyone can replay the message.",
+        summary: "Finalized on Ethereum, but the final payment to the recipient failed. The money is held safely on Ethereum and anyone can send the payment again.",
       };
     }
-    return { state: "FINALIZED", eta: null, who: null, action: null, notes, summary: "Finalized on L1. Nothing is left to do." };
+    return { state: "FINALIZED", eta: null, who: null, action: null, notes, summary: "Finalized on Ethereum. Nothing is left to do." };
   }
 
   const live = [];
   for (const p of f.proofs) {
     const why = deadReason(p);
-    if (why) notes.push(`A proof by ${p.submitter} no longer counts: ${why}.`);
+    if (why) notes.push(`An earlier prove step (sent by ${p.submitter}) no longer counts: ${why}.`);
     else live.push({ ...p, readyAt: Math.max(p.provenAt + f.config.maturitySec + 1, gameReadyAt(p.game, f.config)) });
   }
 
@@ -59,7 +59,7 @@ export function verdict(f) {
     return {
       state: "READY_TO_FINALIZE", eta: null, who: "anyone", notes, proof: { submitter: ready.submitter, provenAt: ready.provenAt },
       action: `OptimismPortal.finalizeWithdrawalTransactionExternalProof(withdrawal ${tx}, ${ready.submitter})`,
-      summary: "Ready to finalize. Anyone can send the finalize transaction; the funds go to the withdrawal's recipient, never to the sender of the transaction.",
+      summary: "Ready to finalize. Anyone can send the finalize transaction; the money goes to the withdrawal's recipient, never to whoever sends it.",
     };
   }
 
@@ -68,14 +68,14 @@ export function verdict(f) {
     return {
       state: "WAITING_TO_FINALIZE", eta: next.readyAt, who: null, notes, proof: { submitter: next.submitter, provenAt: next.provenAt },
       action: null,
-      summary: "Proven. Waiting for the proof window and the dispute game to finish before anyone can finalize.",
+      summary: "Proven. Waiting out the safety period before anyone can finalize.",
     };
   }
 
   if (!f.coverage.covered) {
     return {
       state: "WAITING_FOR_GAME", eta: t + f.config.cadenceSec, who: null, notes, action: null,
-      summary: "Waiting for the next state proposal on L1 to include this withdrawal. Then anyone can prove it.",
+      summary: "Waiting for the network's next state report on Ethereum to include this withdrawal. Then anyone can prove it.",
     };
   }
 
@@ -83,8 +83,8 @@ export function verdict(f) {
     state: "READY_TO_PROVE", eta: null, who: "anyone", notes,
     action: `OptimismPortal.proveWithdrawalTransaction(withdrawal ${tx}, game index, output root proof, storage proof)`,
     summary: f.proofs.length
-      ? "Must be proven again: no earlier proof still counts. Anyone can prove it; the funds still go only to the recipient."
-      : "Ready to prove. Anyone can prove it; the funds go only to the withdrawal's recipient.",
+      ? "Must be proven again: the earlier prove step no longer counts. Anyone can prove it; the money still goes only to the recipient."
+      : "Ready to prove. Anyone can prove it; the money goes only to the withdrawal's recipient.",
   };
 }
 
@@ -98,18 +98,18 @@ export function verdict(f) {
 function blastVerdict(f) {
   const t = f.l1.timestamp;
   const notes = [];
-  if (f.feeVault) notes.push("This is a fee vault withdrawal: protocol revenue moving to L1, not a user's funds.");
-  if (f.usdb) notes.push("This is USDB. Finalizing does not pay it yet: Blast's bridge puts the DAI in its USD yield manager's queue, and only the recipient can claim it from there (Blast's bridge app shows the claim).");
+  if (f.feeVault) notes.push("This is a fee withdrawal: the network moving its own earnings to Ethereum, not a person's money.");
+  if (f.usdb) notes.push("This is USDB. Finalizing doesn't pay it out yet: Blast turns it into DAI that only the recipient can claim, in Blast's bridge app.");
   const tx = `(${f.withdrawal.hash})`;
   if (f.finalized) {
     if (f.relay === "failed") {
       return {
         state: "RELAY_FAILED", eta: null, who: "anyone", notes,
         action: `L1CrossDomainMessenger.relayMessage with the original message ${tx}`,
-        summary: "Finalized on L1, but the messenger's call to the recipient failed. The funds sit in the L1 messenger and anyone can replay the message.",
+        summary: "Finalized on Ethereum, but the final payment to the recipient failed. The money is held safely on Ethereum and anyone can send the payment again.",
       };
     }
-    return { state: "FINALIZED", eta: null, who: null, action: null, notes, summary: "Finalized on L1. Nothing is left to do." };
+    return { state: "FINALIZED", eta: null, who: null, action: null, notes, summary: "Finalized on Ethereum. Nothing is left to do." };
   }
 
   const p = f.proven;
@@ -123,30 +123,30 @@ function blastVerdict(f) {
       return {
         state: "READY_TO_FINALIZE", eta: null, who: "anyone", notes, proof: { provenAt: p.provenAt },
         action: `OptimismPortal.finalizeWithdrawalTransaction(hintId ${hint}, withdrawal ${tx})`,
-        summary: "Ready to finalize. Anyone can send the finalize transaction; the funds go to the withdrawal's recipient, never to the sender of the transaction.",
+        summary: "Ready to finalize. Anyone can send the finalize transaction; the money goes to the withdrawal's recipient, never to whoever sends it.",
       };
     }
-    if (!queued) notes.push("Its ETH is a request in Blast's ETH yield manager queue, which the yield manager has not finalized yet. Blast finalizes the queue as ETH comes back from its yield providers; until then the withdrawal can't be finalized.");
+    if (!queued) notes.push("This ETH is waiting in Blast's payout queue, which Blast fills as funds come back from where it earns yield. Finalize opens once Blast releases it; there is nothing to do until then.");
     return {
       state: "WAITING_TO_FINALIZE", eta: queued ? opensAt : null, who: null, notes, proof: { provenAt: p.provenAt },
       action: null,
-      summary: "Proven. Waiting for the one-day finalization period before anyone can finalize.",
+      summary: "Proven. Waiting out the one-day safety period before anyone can finalize.",
     };
   }
-  if (p) notes.push("The output it was proven against was replaced on L1, so that proof no longer counts.");
+  if (p) notes.push("Its earlier prove step no longer counts: the state report it was checked against was replaced.");
 
   if (!f.coverage.covered) {
     return {
       state: "WAITING_FOR_GAME", eta: t + f.config.cadenceSec, who: null, notes, action: null,
-      summary: "Waiting for the next output proposal on L1 to include this withdrawal. Then anyone can prove it.",
+      summary: "Waiting for Blast's next state report on Ethereum to include this withdrawal. Then anyone can prove it.",
     };
   }
   return {
     state: "READY_TO_PROVE", eta: null, who: "anyone", notes,
     action: `OptimismPortal.proveWithdrawalTransaction(withdrawal ${tx}, output index, output root proof, storage proof)`,
     summary: p
-      ? "Must be proven again: its earlier proof no longer counts. Anyone can prove it; the funds still go only to the recipient."
-      : "Ready to prove. Anyone can prove it; the funds go only to the withdrawal's recipient.",
+      ? "Must be proven again: its earlier prove step no longer counts. Anyone can prove it; the money still goes only to the recipient."
+      : "Ready to prove. Anyone can prove it; the money goes only to the withdrawal's recipient.",
   };
 }
 
@@ -164,53 +164,53 @@ function arbitrumVerdict(f) {
   if (f.spent) {
     const claim = f.claim;
     if (claim && !sameAddress(claim.by, f.asset.to) && !sameAddress(claim.by, f.asset.from)) {
-      notes.push("Someone other than the sender or the recipient sent the claim. The Outbox paid the recipient regardless; nothing is owed to whoever sent it.");
+      notes.push(thirdPartyNote("claim"));
     }
     // "pending" means the page is still looking (check() with deferExtras); it fills in the claimer when done.
-    if (!claim && f.claimLookup && f.claimLookup !== "pending") notes.push("Could not find who sent the claim: that needs historical state the free RPCs did not serve.");
+    if (!claim && f.claimLookup && f.claimLookup !== "pending") notes.push("We couldn't find who sent the claim: the free data sources didn't return that part of history. The money still went to the recipient.");
     return {
       state: "CLAIMED", eta: null, who: null, action: null, notes, claim,
-      summary: "Claimed on L1. The funds went to the recipient; nothing is left to do.",
+      summary: "Claimed on Ethereum. The money went to the recipient; nothing is left to do.",
     };
   }
 
   if (f.confirmed.covered) {
     const n = f.proof ? `${f.proof.hashes.length}-hash proof` : "proof";
     if (f.proof && !(f.proof.leafMatches && f.proof.rootConfirmed)) {
-      notes.push("The proof the L2 RPC returned did not check out against this withdrawal and the Outbox's confirmed roots. Build it again before sending the claim.");
+      notes.push("The claim details we got from the free data sources didn't check out. Check again before anyone sends the claim.");
     }
     return {
       state: "READY_TO_CLAIM", eta: null, who: "anyone", notes,
       action: `Outbox.executeTransaction(${n} from NodeInterface.constructOutboxProof(${f.proof?.size ?? f.confirmed.sendCount}, ${w.position}), ${w.position}, ${w.sender}, ${w.target}, ${w.arbBlockNum}, ${w.ethBlockNum}, ${w.timestamp}, ${w.value}, ${w.data === "0x" ? "0x" : "data"})`,
-      summary: "Confirmed and ready to claim. Anyone can send the claim; the funds go only to the withdrawal's recipient.",
+      summary: "Confirmed and ready to claim. Anyone can send the claim; the money goes only to the withdrawal's recipient.",
     };
   }
 
   if (!f.covering) {
     return {
       state: "WAITING_FOR_CONFIRMATION", eta: t + c.cadenceSec + c.confirmPeriodBlocks * c.l1BlockSec, who: null, notes, action: null,
-      summary: `Waiting for the next assertion on L1 to include this withdrawal, then for its ${windowText} challenge window. Then anyone can claim it.`,
+      summary: `Waiting for the network's next state report on Ethereum to include this withdrawal, then for its ${windowText} safety wait. Then anyone can claim it.`,
     };
   }
 
   const left = f.covering.deadlineBlock - f.l1.block;
   if (left <= 0) {
-    if (c.anyoneCanConfirm) notes.push("Anyone may confirm the assertion (RollupUserLogic.confirmAssertion); validators normally do it within the hour.");
-    else notes.push(`On this chain only the rollup's whitelisted validators may confirm the assertion (anyone may only once they have been idle for weeks); they post one about every ${Math.round(c.cadenceSec / 60)} minutes, so it normally comes soon.`);
+    if (c.anyoneCanConfirm) notes.push("The safety wait is over; the report only needs confirming on Ethereum, which usually happens within the hour.");
+    else notes.push(`The safety wait is over; the report only needs confirming. On this chain the network's own operators confirm it, about every ${Math.round(c.cadenceSec / 60)} minutes, so it normally comes soon.`);
     return {
       state: "WAITING_FOR_CONFIRMATION", eta: t, who: null, notes, action: null,
-      summary: "The challenge window is over. The assertion that includes this withdrawal only waits to be confirmed; then anyone can claim it.",
+      summary: "The safety wait is over. The state report that includes this withdrawal only needs confirming; then anyone can claim it.",
     };
   }
   return {
     state: "WAITING_FOR_CONFIRMATION", eta: t + left * c.l1BlockSec, who: null, notes, action: null,
-    summary: `Included in an assertion on L1 (created at block ${f.covering.createdAtBlock}). Waiting for its ${windowText} challenge window to end; then anyone can claim it.`,
+    summary: `Included in a state report on Ethereum (block ${f.covering.createdAtBlock}). Waiting for its ${windowText} safety wait to end; then anyone can claim it.`,
   };
 }
 
 const isThirdParty = (claim, asset) => !!claim && !sameAddress(claim.by, asset.to) && !sameAddress(claim.by, asset.from);
-const thirdPartyNote = (step, payer) =>
-  `Someone other than the sender or the recipient sent the ${step}. The ${payer} paid the recipient regardless; nothing is owed to whoever sent it.`;
+const thirdPartyNote = (step) =>
+  `Someone other than the sender or the recipient sent the ${step}. That's allowed: the money still went to the recipient, and nothing is owed to whoever sent it.`;
 
 const LINEA_APP_DAYS = 90;
 const eth = (wei) => {
@@ -230,11 +230,11 @@ function lineaVerdict(f) {
   const notes = [];
 
   if (f.claimed) {
-    if (isThirdParty(f.claim, f.asset)) notes.push(thirdPartyNote("claim", "rollup"));
-    if (!f.claim && f.claimLookup) notes.push("Could not find who sent the claim: the free RPCs did not return its log.");
+    if (isThirdParty(f.claim, f.asset)) notes.push(thirdPartyNote("claim"));
+    if (!f.claim && f.claimLookup) notes.push("We couldn't find who sent the claim: the free data sources didn't return it. The money still went to the recipient.");
     return {
       state: "CLAIMED", eta: null, who: null, action: null, notes, claim: f.claim,
-      summary: "Claimed on L1. The funds went to the recipient; nothing is left to do.",
+      summary: "Claimed on Ethereum. The money went to the recipient; nothing is left to do.",
     };
   }
 
@@ -242,25 +242,25 @@ function lineaVerdict(f) {
     const lag = c.finalizedL2Timestamp != null ? t - c.finalizedL2Timestamp : 0;
     return {
       state: "WAITING_FOR_FINALIZATION", eta: Math.max(t, f.l2.timestamp + lag), who: null, notes, action: null,
-      summary: "Waiting for Linea to finalize this block on Ethereum. Then anyone can claim it on L1; nothing claims it automatically.",
+      summary: "Waiting for Linea to confirm this withdrawal on Ethereum. Then anyone can claim it there; nothing claims it automatically.",
     };
   }
 
   if (w.fee > 0n) {
-    notes.push(`The ${eth(w.fee)} fee paid on Linea goes to whoever sends the claim (for plain ETH to a wallet, only the claim's gas cost; the rest is refunded to the recipient).`);
+    notes.push(`A ${eth(w.fee)} fee was paid on Linea for the claim. Whoever sends the claim gets it (for plain ETH to a wallet, only enough to cover the claim's cost; the rest goes back to the recipient).`);
   }
   if (t - f.l2.timestamp > LINEA_APP_DAYS * 86400) {
-    notes.push(`The Linea bridge app stops listing unclaimed withdrawals after ${LINEA_APP_DAYS} days. The call below still works.`);
+    notes.push(`The Linea bridge app stops showing unclaimed withdrawals after ${LINEA_APP_DAYS} days, but the claim still works when sent another way.`);
   }
   const r = c.rateLimit;
   const used = r.periodEnd >= t ? r.usedWei : 0n;
   if (w.value + w.fee > r.limitWei - used) {
-    notes.push(`Claims on L1 share a daily limit of ${eth(r.limitWei)}; ${eth(used)} is used this period, so a claim this size reverts until the period ends.`);
+    notes.push(`Linea limits how much can be claimed per day (${eth(r.limitWei)}); ${eth(used)} is used so far, so a claim this size can't go through until the limit resets.`);
   }
-  if (c.paused) notes.push("Claims are paused on L1 right now. The call below reverts until they are resumed.");
-  if (!w.legacy && !f.proof) notes.push("Could not rebuild the Merkle proof from the public RPCs. The Linea SDK's getMessageProof builds it.");
+  if (c.paused) notes.push("Linea has paused claims right now. The claim will work again once they resume.");
+  if (!w.legacy && !f.proof) notes.push("We couldn't build the claim details from the free data sources. Try again later, or claim it in the Linea bridge app.");
   if (f.proof && !f.proof.rootConfirmed) {
-    notes.push("The proof rebuilt from the finalization did not check out against the roots the L1 rollup accepts. Build it again before sending the claim.");
+    notes.push("The claim details we built didn't check out. Check again before anyone sends the claim.");
   }
 
   const data = w.data === "0x" ? "0x" : "data";
@@ -269,7 +269,7 @@ function lineaVerdict(f) {
     : `LineaRollup.claimMessageWithProof({proof: ${f.proof ? `${f.proof.hashes.length} hashes` : "the Merkle proof"}, messageNumber: ${w.nonce}, leafIndex: ${f.proof?.leafIndex ?? "?"}, from: ${w.from}, to: ${w.to}, fee: ${w.fee}, value: ${w.value}, feeRecipient: any address (0x0 pays the sender), merkleRoot: ${f.proof?.root ?? "?"}, data: ${data}})`;
   return {
     state: "READY_TO_CLAIM", eta: null, who: "anyone", notes, action,
-    summary: "Finalized on L1 and ready to claim. Anyone can send the claim; the funds go only to the withdrawal's recipient. Nothing claims it automatically.",
+    summary: "Confirmed on Ethereum and ready to claim. Anyone can send the claim; the money goes only to the withdrawal's recipient. Nothing claims it automatically.",
   };
 }
 
@@ -285,12 +285,12 @@ function zksyncVerdict(f) {
   if (f.finalized) {
     const claim = f.claim;
     if (claim && sameAddress(claim.via, ZKSYNC.finalizer)) {
-      notes.push(`Finalized automatically through the WithdrawalFinalizer contract (${ZKSYNC.finalizer}), which finishes most ZKsync withdrawals in batches.`);
-    } else if (isThirdParty(claim, f.asset)) notes.push(thirdPartyNote("finalize transaction", "bridge"));
-    if (!claim && f.claimLookup && f.claimLookup !== "pending") notes.push("Could not find who sent the finalize transaction: that needs historical state the free RPCs did not serve.");
+      notes.push("ZKsync's automatic service finished it, as it does for most ZKsync withdrawals.");
+    } else if (isThirdParty(claim, f.asset)) notes.push(thirdPartyNote("finalize transaction"));
+    if (!claim && f.claimLookup && f.claimLookup !== "pending") notes.push("We couldn't find who sent the finalize transaction: the free data sources didn't return that part of history. The money still went to the recipient.");
     return {
       state: "FINALIZED", eta: null, who: null, action: null, notes, claim,
-      summary: "Finalized on L1. The funds went to the recipient; nothing is left to do.",
+      summary: "Finalized on Ethereum. The money went to the recipient; nothing is left to do.",
     };
   }
 
@@ -303,13 +303,13 @@ function zksyncVerdict(f) {
     };
   }
 
-  notes.push("Most ZKsync withdrawals are finalized automatically soon after their batch is executed. This one is still open, so anyone can finalize it.");
+  notes.push("Most ZKsync withdrawals are finished automatically soon after this point. This one is still open, so anyone can finish it.");
   if (f.proof && !f.proof.simulated) {
-    notes.push("A dry run of this call on L1 (eth_call) did not succeed with the proof the L2 RPC returned. Fetch the proof again before sending it.");
+    notes.push("A test run of the finalize step didn't succeed with the details we got. Check again before anyone sends it.");
   }
   return {
     state: "READY_TO_FINALIZE", eta: null, who: "anyone", notes,
     action: `L1Nullifier.finalizeDeposit({chainId: 324, l2BatchNumber: ${w.batch}, l2MessageIndex: ${w.index}, l2Sender: ${w.sender}, l2TxNumberInBatch: ${w.txNumberInBatch}, message: ${w.message}, merkleProof: ${f.proof ? `${f.proof.hashes.length} hashes` : "from zks_getL2ToL1LogProof"}})`,
-    summary: "Its batch is executed on L1 and it is ready to finalize. Anyone can send the finalize transaction; the funds go only to the withdrawal's recipient.",
+    summary: "Confirmed on Ethereum and ready to finalize. Anyone can send the finalize transaction; the money goes only to the withdrawal's recipient.",
   };
 }
