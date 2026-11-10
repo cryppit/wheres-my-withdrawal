@@ -7,6 +7,7 @@ const STACKS = {
   blast: ["Started", "Prove", "Safety wait", "Finalize on Ethereum"],
   arbitrum: ["Started", "Confirmed on Ethereum", "Claim"],
   linea: ["Started", "Confirmed on Ethereum", "Claim"],
+  morph: ["Started", "Posted to Ethereum", "Challenge period", "Claim in Morph's bridge"],
   zksync: ["Started", "Confirmed on Ethereum", "Finalize"],
 };
 
@@ -22,6 +23,7 @@ function position(stack, state) {
     case "WAITING_FOR_GAME":
       return [1, "waiting"];
     case "WAITING_TO_FINALIZE":
+    case "WAITING_IN_CHALLENGE":
       return [2, "waiting"];
     case "READY_TO_FINALIZE":
     case "READY_TO_CLAIM":

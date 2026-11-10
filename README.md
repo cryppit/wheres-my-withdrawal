@@ -14,8 +14,15 @@ It never asks for keys, never connects a wallet and never signs anything.
 
 Supported now: **OP Mainnet** (including withdrawals started before the Bedrock upgrade of 6 June 2023), **Base**,
 **Unichain**, **Ink**, **Soneium**, **World Chain**, **Mode**, **Zora**, **Blast** (its own portal, below), **Arbitrum One**
-(Nitro withdrawals, since 31 Aug 2022), **Robinhood Chain** (since its mainnet, 1 Jul 2026), **Linea** and **ZKsync Era**
-(withdrawals through the ZKsync bridge).
+(Nitro withdrawals, since 31 Aug 2022), **Robinhood Chain** (since its mainnet, 1 Jul 2026), **Linea**, **ZKsync Era**
+(withdrawals through the ZKsync bridge) and **Morph** (status only, below).
+
+Morph is a Scroll-style rollup. For it this tool tracks the status of a withdrawal — initiated, posted to Ethereum,
+inside the challenge period (with the time left), ready to claim, or claimed — but does **not** build the claim. The
+claim (`L1CrossDomainMessenger.proveAndRelayMessage`) needs a Merkle proof against a finalized withdraw-tree root that
+Morph's bridge backend produces and that is not served by any public endpoint, so a ready-to-claim Morph withdrawal is
+handed off to Morph's bridge app (https://bridge.morph.network, under Transactions / Withdrawals) rather than turned
+into a half-built transaction.
 
 Blast keeps the OP Stack's older portal (1.10.0): withdrawals are proven against an L2OutputOracle output, finalize one
 day later, and only one proof per withdrawal counts. ETH withdrawals also pass through Blast's ETH yield manager:
@@ -69,6 +76,11 @@ and rehearses it with `eth_call`, read-only:
 It refuses a withdrawal that is not ready to claim. Anyone can send the printed call from their own wallet; the funds go
 only to the withdrawal's recipient.
 
+There is deliberately no claim builder for Morph. Its claim needs a withdraw-tree Merkle proof that only Morph's bridge
+backend produces (it is not reconstructable from `eth_getProof` or from public logs the way Linea's is), so building a
+claim here would mean fabricating a proof. A ready-to-claim Morph withdrawal is instead a verdict that hands the claim
+off to Morph's bridge app, which supplies the proof.
+
 ## How it decides (October 2026)
 
 OP Mainnet and Base changed their proof systems in 2026, and checks written for the 2024 layout get both wrong.
@@ -85,6 +97,7 @@ ZK rollups: there is no challenge window, only the wait for the L1 to finalize o
 | Robinhood Chain | BoLD assertions, as on Arbitrum One, from a validator whitelist (`validatorWhitelistDisabled()` is false) | as on Arbitrum One | 45,818 L1 blocks (about 6.4 days) after the assertion; assertions come about every 30 minutes (measured 26 Oct 2026) | none |
 | Linea | ZK validity proofs; the L1 rollup finalizes L2 blocks (no prove step for the user) | the rollup's `currentL2BlockNumber()` ≥ the withdrawal's L2 block | until that block is finalized: 1.8 to 3.3 hours in reads on 24 Oct 2026 | messages from before L2 block 2,242,568 (Feb 2024) use the legacy `claimMessage`; nothing expires on chain, but the bridge app stops listing a withdrawal after 90 days |
 | ZKsync Era | ZK validity proofs; batches are committed, proven and executed on L1 | the withdrawal's batch is ≤ `getTotalBatchesExecuted()` on the Era diamond | until the batch is executed: 3 hours at least (`executionDelay`), about 24 hours after commit in October 2026 | withdrawals finalized before the shared bridge (2024) are recorded on the Era diamond or the legacy ERC-20 bridge |
+| Morph | Optimistic; sequencers commit each batch's withdraw-tree root to the Rollup, which finalizes it after a challenge period (status only — claim handed off to Morph's bridge app) | the batch whose last L2 block ≥ the withdrawal's block is finalized (`batchDataStore(lastFinalizedBatchIndex).blockNumber`); claimed when `finalizedWithdrawals(hash)` is true on the L1 messenger | `Rollup.finalizationPeriodSeconds()`, read live: 172,800 s (2 days) on mainnet, 10 Nov 2026 (7 days on the Holesky testnet) | none: a finalized withdrawal stays claimable indefinitely |
 
 For each OP Mainnet or Base withdrawal it reads, at the latest **finalized** Ethereum block:
 

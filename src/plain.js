@@ -117,6 +117,17 @@ export function plainNext(r) {
     }
 
     case "READY_TO_CLAIM":
+      if (stack === "morph") {
+        return {
+          headline: "Ready: one last step in Morph's bridge app pays your money.",
+          steps: [
+            "The challenge period is over, so this withdrawal can now be claimed.",
+            `Open Morph's bridge app at https://bridge.morph.network with any wallet, go to Transactions (or Withdrawals), find this withdrawal and send the claim. The money goes only to ${to}, whoever sends it.`,
+            "The claim needs a proof that only Morph's bridge service builds, so the bridge app is the way to get it. A tool that pastes a hand-made proof will not work.",
+            SCAM,
+          ],
+        };
+      }
       return {
         headline: "Ready: one last transaction, the claim, pays your money.",
         steps: [
@@ -130,6 +141,7 @@ export function plainNext(r) {
     case "WAITING_FOR_CONFIRMATION":
     case "WAITING_FOR_FINALIZATION":
     case "WAITING_FOR_BATCH":
+    case "WAITING_IN_CHALLENGE":
       return {
         headline: "Your withdrawal is on its way. Nothing to do yet.",
         steps: [
@@ -137,7 +149,9 @@ export function plainNext(r) {
           ...(v.eta ? [`It should be ready about ${when(v.eta, now)}.`] : []),
           stack === "zksync"
             ? `After that, one last transaction (finalize) pays the money to ${to}; ZKsync's own service usually sends it.`
-            : `After that, one last transaction (the claim) pays the money to ${to}. ${onlyThere}`,
+            : stack === "morph"
+              ? `After that, claim it in Morph's bridge app (https://bridge.morph.network); the money goes only to ${to}.`
+              : `After that, one last transaction (the claim) pays the money to ${to}. ${onlyThere}`,
         ],
       };
 

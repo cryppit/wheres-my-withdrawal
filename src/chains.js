@@ -205,6 +205,31 @@ export const CHAINS = {
     l1TokenBridge: "0x051f1d88f0af5763fb888ec4378b4d8b29ea3319",
     explorer: "https://lineascan.build/tx/",
   },
+  // Morph is a Scroll-style rollup (its own L1/L2 contracts, NOT OP Stack), verified against morph-l2/morph on GitHub
+  // and on chain on 10 Nov 2026. The L1 messenger's rollup() names this rollup and its counterpart() names the L2
+  // messenger predeploy (0x53..07); the L2 messenger's counterpart() names this L1 messenger. The challenge period is
+  // read live from Rollup.finalizationPeriodSeconds(); the mainnet value on 10 Nov 2026 was 172800 (2 days) — the
+  // 7 days in Morph's docs is the Holesky testnet. The claim is proveAndRelayMessage on the L1 messenger, whose Merkle
+  // proof (bytes32[32] against a finalized withdraw-tree root) is produced by Morph's bridge backend and is not on any
+  // public endpoint, so this tool tracks status and hands the claim off to Morph's bridge app (honest v1).
+  morph: {
+    id: "morph",
+    name: "Morph",
+    stack: "morph",
+    l2ChainId: 2818,
+    // rpc-bgw.morph.network serves receipts, 50,000-block eth_getLogs ranges and the predeploys, with CORS (10 Nov 2026).
+    l2Rpcs: ["https://rpc-bgw.morph.network", "https://rpc-quicknode.morph.network"],
+    l1Rpcs: L1_RPCS,
+    l1ArchiveRpcs: L1_ARCHIVE_RPCS, // who sent the claim: a RelayedMessage log search over old L1 history
+    rollup: "0x759894ced0e6af42c26668076ffa84d02e3cef60",
+    l1Messenger: "0xdc71366effa760804dcfc3edf87fa2a6f1623304",
+    l2Messenger: "0x5300000000000000000000000000000000000007",
+    l2MessagePasser: "0x5300000000000000000000000000000000000001",
+    // The fallback if finalizationPeriodSeconds() cannot be read; the code prefers the live value.
+    challengePeriodSec: 172800,
+    bridgeUrl: "https://bridge.morph.network",
+    explorer: "https://explorer.morph.network/tx/",
+  },
   zksync: {
     id: "zksync",
     name: "ZKsync Era",

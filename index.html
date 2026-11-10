@@ -264,7 +264,7 @@
       <form id="f">
         <label for="tx">Transaction hash (the one that started the withdrawal)</label>
         <input id="tx" name="tx" placeholder="0x… the transaction that started it" autocomplete="off" spellcheck="false">
-        <select id="chain" aria-label="Chain"><option value="auto">Find the chain for me</option><optgroup label="OP Stack"><option value="op">OP Mainnet</option><option value="base">Base</option><option value="unichain">Unichain</option><option value="ink">Ink</option><option value="soneium">Soneium</option><option value="worldchain">World Chain</option><option value="mode">Mode</option><option value="zora">Zora</option><option value="blast">Blast</option></optgroup><optgroup label="Arbitrum"><option value="arb">Arbitrum One</option><option value="robinhood">Robinhood Chain</option></optgroup><optgroup label="Other rollups"><option value="linea">Linea</option><option value="zksync">ZKsync Era</option></optgroup></select>
+        <select id="chain" aria-label="Chain"><option value="auto">Find the chain for me</option><optgroup label="OP Stack"><option value="op">OP Mainnet</option><option value="base">Base</option><option value="unichain">Unichain</option><option value="ink">Ink</option><option value="soneium">Soneium</option><option value="worldchain">World Chain</option><option value="mode">Mode</option><option value="zora">Zora</option><option value="blast">Blast</option></optgroup><optgroup label="Arbitrum"><option value="arb">Arbitrum One</option><option value="robinhood">Robinhood Chain</option></optgroup><optgroup label="Other rollups"><option value="linea">Linea</option><option value="morph">Morph</option><option value="zksync">ZKsync Era</option></optgroup></select>
         <button class="go" id="go" type="submit">Check withdrawal →</button>
       </form>
       <p class="hint">Your browser reads the public blockchain data directly. No wallet, no keys, nothing signed.</p>
@@ -353,7 +353,7 @@
     FINALIZED: ["Done", "s-done"], RELAY_FAILED: ["Needs resending", "s-bad"], READY_TO_FINALIZE: ["Ready to finalize", "s-ready"],
     WAITING_TO_FINALIZE: ["Waiting", "s-wait"], READY_TO_PROVE: ["Ready to prove", "s-ready"], WAITING_FOR_GAME: ["Waiting", "s-wait"],
     CLAIMED: ["Done", "s-done"], READY_TO_CLAIM: ["Ready to claim", "s-ready"], WAITING_FOR_CONFIRMATION: ["Waiting", "s-wait"],
-    WAITING_FOR_FINALIZATION: ["Waiting", "s-wait"], WAITING_FOR_BATCH: ["Waiting", "s-wait"],
+    WAITING_FOR_FINALIZATION: ["Waiting", "s-wait"], WAITING_FOR_BATCH: ["Waiting", "s-wait"], WAITING_IN_CHALLENGE: ["Waiting", "s-wait"],
   };
   const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
   // What shows while a check reads public data: a glowing card that says what is being read, so nobody thinks it froze.

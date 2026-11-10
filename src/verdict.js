@@ -28,6 +28,7 @@ function gameReadyAt(g, config) {
 export function verdict(f) {
   if (f.stack === "arbitrum") return arbitrumVerdict(f);
   if (f.stack === "linea") return lineaVerdict(f);
+  if (f.stack === "morph") return morphVerdict(f);
   if (f.stack === "zksync") return zksyncVerdict(f);
   if (f.stack === "blast") return blastVerdict(f);
   const t = f.l1.timestamp;
@@ -270,6 +271,50 @@ function lineaVerdict(f) {
   return {
     state: "READY_TO_CLAIM", eta: null, who: "anyone", notes, action,
     summary: "Confirmed on Ethereum and ready to claim. Anyone can send the claim; the money goes only to the withdrawal's recipient. Nothing claims it automatically.",
+  };
+}
+
+/**
+ * Morph (Scroll-style). A withdrawal is a SentMessage whose hash is appended to the L2 withdraw tree; sequencers
+ * commit each batch's root to the Rollup and, after the challenge period, finalize it. The claim is
+ * proveAndRelayMessage on the L1 messenger, but its Merkle proof is produced by Morph's bridge backend and is not on
+ * any public endpoint, so a claimable withdrawal is an honest handoff to Morph's bridge app, never a half-built call.
+ */
+function morphVerdict(f) {
+  const t = f.l1.timestamp;
+  const notes = [];
+  if (f.feeVault) notes.push("This is a fee withdrawal: the network moving its own earnings to Ethereum, not a person's money.");
+  if (!f.hashVerified) notes.push("We couldn't match this withdrawal to its entry in Morph's withdraw tree from the free endpoints. Check again before anyone acts on it.");
+  const days = Math.round(f.config.challengePeriodSec / 86400);
+
+  if (f.claimed) {
+    if (isThirdParty(f.claim, f.asset)) notes.push(thirdPartyNote("claim"));
+    if (!f.claim && f.claimLookup) notes.push("We couldn't find who sent the claim: the free data sources didn't return it. The money still went to the recipient.");
+    return {
+      state: "CLAIMED", eta: null, who: null, action: null, notes, claim: f.claim,
+      summary: "Claimed on Ethereum. The money went to the recipient; nothing is left to do.",
+    };
+  }
+
+  if (f.finalized) {
+    notes.push("The claim is one transaction on Ethereum, but the Merkle proof it needs is built by Morph's bridge service and isn't served by any public endpoint, so it has to be finished in Morph's bridge app. Anyone can send it, and the money still goes only to the recipient.");
+    return {
+      state: "READY_TO_CLAIM", eta: null, who: "anyone", notes,
+      action: "Finish the claim in Morph's bridge app (https://bridge.morph.network), under Transactions / Withdrawals — Morph supplies the proof the claim needs.",
+      summary: "Confirmed on Ethereum and ready to claim. Finish the claim in Morph's bridge app; the proof it needs comes from Morph, and the money goes only to the recipient.",
+    };
+  }
+
+  if (f.committed) {
+    return {
+      state: "WAITING_IN_CHALLENGE", eta: f.challenge?.finalizeTimestamp ?? null, who: null, notes, action: null,
+      summary: `Posted to Ethereum and waiting out Morph's ${days}-day challenge period. After that it can be claimed in Morph's bridge app.`,
+    };
+  }
+
+  return {
+    state: "WAITING_FOR_BATCH", eta: null, who: null, notes, action: null,
+    summary: `Waiting for Morph to post the batch with this withdrawal to Ethereum, then out its ${days}-day challenge period. After that it can be claimed in Morph's bridge app.`,
   };
 }
 

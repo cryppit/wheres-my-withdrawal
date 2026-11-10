@@ -14,6 +14,7 @@ const LABEL = {
   WAITING_FOR_CONFIRMATION: "WAITING",
   WAITING_FOR_FINALIZATION: "WAITING",
   WAITING_FOR_BATCH: "WAITING",
+  WAITING_IN_CHALLENGE: "WAITING",
 };
 
 export const utc = (sec) => new Date(sec * 1000).toISOString().replace("T", " ").slice(0, 16) + " UTC";
