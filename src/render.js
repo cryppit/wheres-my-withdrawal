@@ -64,6 +64,7 @@ export function proofLine(f) {
   const p = f.proof;
   if (!p) return null;
   if (f.stack === "zksync") return `${p.hashes.length} hashes from zks_getL2ToL1LogProof; a dry run of the call on L1 ${p.simulated ? "succeeded" : "failed"}`;
+  if (f.stack === "polygonzkevm") return `two 32-node Merkle proofs; folds to rollup exit root ${p.rollupExitRoot}, recorded on L1: ${p.gerRecorded ? "yes" : "no"} (proof checks out: ${p.rootConfirmed ? "yes" : "no"})`;
   return `${p.hashes.length} hashes, root ${p.root} (confirmed on L1: ${p.rootConfirmed ? "yes" : "no"})`;
 }
 

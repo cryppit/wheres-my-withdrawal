@@ -10,7 +10,7 @@
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <meta property="og:type" content="website">
 <meta property="og:title" content="Where's My Withdrawal: find the missing step">
-<meta property="og:description" content="Stuck withdrawal back to Ethereum, from 15 networks including Base, Arbitrum, OP Mainnet, Blast, Linea and ZKsync? See what step is missing, when it opens and who can finish it. Free, read-only, by Cryppit.">
+<meta property="og:description" content="Stuck withdrawal back to Ethereum, from 16 networks including Base, Arbitrum, OP Mainnet, Blast, Linea and ZKsync? See what step is missing, when it opens and who can finish it. Free, read-only, by Cryppit.">
 <meta property="og:url" content="https://cryppit.github.io/wheres-my-withdrawal/">
 <meta property="og:image" content="https://cryppit.github.io/wheres-my-withdrawal/icons/og.png">
 <meta property="og:image:width" content="1200">
@@ -27,7 +27,7 @@
   * { box-sizing: border-box; }
   html, body { margin: 0; background: radial-gradient(1100px 600px at 80% -10%, rgba(42, 59, 214, 0.28), transparent 60%), var(--deep); color: var(--ink); font: 16px/1.55 system-ui, -apple-system, "Segoe UI", sans-serif; }
   a { color: var(--lime); text-underline-offset: 3px; }
-  img[src$="linea.svg"], img[src$="zksync.svg"], img[src$="soneium.svg"], img[src$="worldchain.svg"], img[src$="scroll.svg"] { background: #f3efe4; border-radius: 50%; padding: 3px; box-sizing: border-box; }
+  img[src$="linea.svg"], img[src$="zksync.svg"], img[src$="soneium.svg"], img[src$="worldchain.svg"], img[src$="scroll.svg"], img[src$="polygonzkevm.svg"] { background: #f3efe4; border-radius: 50%; padding: 3px; box-sizing: border-box; }
   input:focus-visible, button:focus-visible, select:focus-visible { outline: 2px solid var(--lime); outline-offset: 2px; }
   button.go:disabled { opacity: 0.6; cursor: wait; }
   #out { margin-top: 28px; }
@@ -229,7 +229,7 @@
       <p class="lede">Moving money from Base, Arbitrum, OP Mainnet or another network back to Ethereum? Paste the transaction that started it. See whether it is done, what step is missing, when it opens, and who can take it, read from Ethereum itself.</p>
       <p class="ctas"><a class="btn lime-btn" href="#check">Check a withdrawal →</a><a class="btn ghost-btn" href="https://github.com/cryppit/wheres-my-withdrawal" target="_blank" rel="noopener noreferrer">View on GitHub</a></p>
       <dl class="stats">
-        <div><dt>15 networks</dt><dd>to Ethereum</dd></div>
+        <div><dt>16 networks</dt><dd>to Ethereum</dd></div>
         <div><dt>0 keys</dt><dd>nothing to sign</dd></div>
         <div><dt>MIT</dt><dd>open source</dd></div>
         <div><dt>165 tests</dt><dd>run offline</dd></div>
@@ -264,7 +264,7 @@
       <form id="f">
         <label for="tx">Transaction hash (the one that started the withdrawal)</label>
         <input id="tx" name="tx" placeholder="0x… the transaction that started it" autocomplete="off" spellcheck="false">
-        <select id="chain" aria-label="Chain"><option value="auto">Find the chain for me</option><optgroup label="OP Stack"><option value="op">OP Mainnet</option><option value="base">Base</option><option value="unichain">Unichain</option><option value="ink">Ink</option><option value="soneium">Soneium</option><option value="worldchain">World Chain</option><option value="mode">Mode</option><option value="zora">Zora</option><option value="blast">Blast</option></optgroup><optgroup label="Arbitrum"><option value="arb">Arbitrum One</option><option value="robinhood">Robinhood Chain</option></optgroup><optgroup label="Other rollups"><option value="linea">Linea</option><option value="morph">Morph</option><option value="scroll">Scroll</option><option value="zksync">ZKsync Era</option></optgroup></select>
+        <select id="chain" aria-label="Chain"><option value="auto">Find the chain for me</option><optgroup label="OP Stack"><option value="op">OP Mainnet</option><option value="base">Base</option><option value="unichain">Unichain</option><option value="ink">Ink</option><option value="soneium">Soneium</option><option value="worldchain">World Chain</option><option value="mode">Mode</option><option value="zora">Zora</option><option value="blast">Blast</option></optgroup><optgroup label="Arbitrum"><option value="arb">Arbitrum One</option><option value="robinhood">Robinhood Chain</option></optgroup><optgroup label="Other rollups"><option value="linea">Linea</option><option value="morph">Morph</option><option value="scroll">Scroll</option><option value="polygonzkevm">Polygon zkEVM</option><option value="zksync">ZKsync Era</option></optgroup></select>
         <button class="go" id="go" type="submit">Check withdrawal →</button>
       </form>
       <p class="hint">Your browser reads the public blockchain data directly. No wallet, no keys, nothing signed.</p>
@@ -339,7 +339,7 @@
 
   <footer>
     <p>Open source (MIT): <a href="https://github.com/cryppit/wheres-my-withdrawal" target="_blank" rel="noopener noreferrer">github.com/cryppit/wheres-my-withdrawal</a> · by <a href="https://cryppit.near.page/">Cryppit</a></p>
-    <p class="muted">Independent project, not affiliated with Ethereum or any of the 15 networks it checks. It never holds keys or signs anything. Chain logos: web3icons (MIT).</p>
+    <p class="muted">Independent project, not affiliated with Ethereum or any of the 16 networks it checks. It never holds keys or signs anything. Chain logos: web3icons (MIT).</p>
   </footer>
 </main>
 <script type="module">

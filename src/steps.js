@@ -9,6 +9,7 @@ const STACKS = {
   linea: ["Started", "Confirmed on Ethereum", "Claim"],
   morph: ["Started", "Posted to Ethereum", "Challenge period", "Claim in Morph's bridge"],
   scroll: ["Started", "Finalized on Ethereum", "Claim"],
+  polygonzkevm: ["Started", "Verified on Ethereum", "Claim"],
   zksync: ["Started", "Confirmed on Ethereum", "Finalize"],
 };
 

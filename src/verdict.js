@@ -30,6 +30,7 @@ export function verdict(f) {
   if (f.stack === "linea") return lineaVerdict(f);
   if (f.stack === "morph") return morphVerdict(f);
   if (f.stack === "scroll") return scrollVerdict(f);
+  if (f.stack === "polygonzkevm") return polygonzkevmVerdict(f);
   if (f.stack === "zksync") return zksyncVerdict(f);
   if (f.stack === "blast") return blastVerdict(f);
   const t = f.l1.timestamp;
@@ -401,5 +402,47 @@ function zksyncVerdict(f) {
     state: "READY_TO_FINALIZE", eta: null, who: "anyone", notes,
     action: `L1Nullifier.finalizeDeposit({chainId: 324, l2BatchNumber: ${w.batch}, l2MessageIndex: ${w.index}, l2Sender: ${w.sender}, l2TxNumberInBatch: ${w.txNumberInBatch}, message: ${w.message}, merkleProof: ${f.proof ? `${f.proof.hashes.length} hashes` : "from zks_getL2ToL1LogProof"}})`,
     summary: "Confirmed on Ethereum and ready to finalize. Anyone can send the finalize transaction; the money goes only to the withdrawal's recipient.",
+  };
+}
+
+/**
+ * Polygon zkEVM (LxLy unified bridge, a validity rollup). A withdrawal is a BridgeEvent whose leaf is in the rollup's
+ * local exit tree; the batch is verified by a zk proof on L1, which records a global exit root in the GER (no challenge
+ * delay). The claim is claimAsset on the L1 bridge; its two Merkle proofs come from Polygon's public, keyless proof
+ * API, which this reader re-folds to the API's rollup exit root AND confirms is a global exit root recorded on L1
+ * (the same check claimAsset makes) before marking it claimable — so a ready withdrawal is a FULL claim, never a blind
+ * hand-off. isClaimed(depositCount, 1) is the done flag.
+ */
+function polygonzkevmVerdict(f) {
+  const notes = [];
+  if (f.asset?.kind === "message") notes.push("This is a bridged message, not a token transfer; it is claimed the same way but carries no funds unless it says so.");
+  const tx = `(leaf ${f.withdrawal.hash})`;
+
+  if (f.claimed) {
+    notes.push("The claim is recorded on Ethereum. Who sent it is not shown here: Polygon's unified bridge does not index claims per withdrawal, so one withdrawal's claim cannot be told apart from every other chain's on free data sources. The money went only to the recipient.");
+    return {
+      state: "CLAIMED", eta: null, who: null, action: null, notes, claim: null,
+      summary: "Claimed on Ethereum. The money went to the recipient; nothing is left to do.",
+    };
+  }
+
+  if (f.finalized) {
+    // finalized is set only when the proof folds to the API's rollup exit root AND that global exit root is recorded
+    // on L1 (globalExitRootMap != 0), so the claim here is a real, checkable call — not a hint.
+    const proof = f.proof ? `{globalIndex: ${f.proof.globalIndex}, 2 x 32-node Merkle proof, rollupExitRoot ${f.proof.rollupExitRoot}}` : "{globalIndex, Merkle proofs from Polygon's proof API}";
+    return {
+      state: "READY_TO_CLAIM", eta: null, who: "anyone", notes,
+      action: `PolygonZkEVMBridgeV2.claimAsset(${f.withdrawal.originNetwork}, ${f.withdrawal.originAddress}, ${f.withdrawal.destinationNetwork}, ${f.withdrawal.destinationAddress}, ${f.withdrawal.amount}, ${proof})`,
+      summary: "Verified on Ethereum and ready to claim. Anyone can send the claim; the money goes only to the withdrawal's recipient. Nothing claims it automatically.",
+    };
+  }
+
+  // Not verified on L1 yet, or the proof could not be checked. Validity proofs carry no fixed wait, so no ETA.
+  if (f.proof && !f.proof.gerRecorded) notes.push("Polygon's proof service returned a proof, but the matching global exit root is not recorded on Ethereum yet; it will be once the batch is verified. Nothing to do until then.");
+  else if (f.proof && !f.proof.proofFolds) notes.push("Polygon's proof service returned a proof that did not fold to its own rollup exit root; this tool will not act on it. Check again later.");
+  if (f.proofLookup === "failed") notes.push("We couldn't reach Polygon's proof service to check whether this is ready to claim yet. The withdrawal is safe; try again in a minute.");
+  return {
+    state: "WAITING_FOR_FINALIZATION", eta: null, who: null, action: null, notes,
+    summary: "Waiting for Polygon to verify the batch with this withdrawal on Ethereum. Polygon proves each batch valid with a zk proof rather than waiting out a challenge period, so there is no fixed wait. After that anyone can claim it; nothing claims it automatically.",
   };
 }

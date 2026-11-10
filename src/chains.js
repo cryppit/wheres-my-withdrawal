@@ -258,6 +258,37 @@ export const CHAINS = {
     bridgeUrl: "https://scroll.io/bridge",
     explorer: "https://scrollscan.com/tx/",
   },
+  // Polygon zkEVM is a validity rollup on the Polygon/AggLayer LxLy UNIFIED BRIDGE — its own family, NOT OP Stack and
+  // NOT Scroll-style. Verified on chain 10 Nov 2026: the PolygonZkEVMBridgeV2 is the SAME address on L1 and L2
+  // (bridge.networkID() == 0 on L1, == 1 on L2), bridge.polygonRollupManager() == rollupManager below and
+  // bridge.globalExitRootManager() == globalExitRoot below; rollupManager.bridgeAddress() names the bridge back and
+  // rollupManager.getRollupExitRoot() == GER.lastRollupExitRoot(). Sources: portal.polygon.technology/bridge app, the
+  // zkevm-contracts verified source (PolygonZkEVMBridgeV2, DepositContractV2 — AGPL, read not copied), each cross-
+  // checked against the getters above. A batch is final the moment its validity proof is verified on L1 and its rollup
+  // exit root is recorded as a global exit root in the GER (no challenge delay). The claim is claimAsset on the L1
+  // bridge (selector 0xccaa2d11, confirmed on chain); done means isClaimed(depositCount, 1) is true. Polygon's public,
+  // keyless, CORS-open proof API (bridgeApi) serves the two Merkle proofs; the reader re-folds them to the API's rollup
+  // exit root AND confirms that global exit root is recorded on L1 before trusting them, so WMW builds the FULL claim.
+  polygonzkevm: {
+    id: "polygonzkevm",
+    name: "Polygon zkEVM",
+    stack: "polygonzkevm",
+    l2ChainId: 1101,
+    // zkevm-rpc.com serves receipts, the bridge and wide eth_getLogs ranges, with CORS (10 Nov 2026).
+    l2Rpcs: ["https://zkevm-rpc.com", "https://polygon-zkevm.drpc.org"],
+    l1Rpcs: L1_RPCS,
+    l1ArchiveRpcs: L1_ARCHIVE_RPCS, // who sent the claim: a ClaimEvent log scan over old L1 history
+    bridge: "0x2a3dd3eb832af982ec71669e178424b10dca2ede", // PolygonZkEVMBridgeV2, same address on L1 and L2
+    rollupManager: "0x5132a183e9f3cb7c848b0aac5ae0c4f0491b7ab2", // PolygonRollupManager (verifies the validity proofs)
+    globalExitRoot: "0x580bda1e7a0cfae92fa7f6c20a3794f169ce3cfb", // PolygonZkEVMGlobalExitRootV2 on L1
+    // Polygon's AggLayer proof API. GET /api/v3/proof/mainnet/merkle-proof?networkId=1&depositCount= -> {proof:
+    // {merkle_proof[32], rollup_merkle_proof[32], main_exit_root, rollup_exit_root}}. Keyless and CORS-open (the
+    // merkle-proof route answered with no key and access-control-allow-origin: * on 10 Nov 2026; the transactions
+    // route needs a key, but WMW decodes the depositCount from the L2 event itself and never calls it).
+    bridgeApi: "https://api-gateway.polygon.technology",
+    bridgeUrl: "https://portal.polygon.technology/bridge",
+    explorer: "https://zkevm.polygonscan.com/tx/",
+  },
   zksync: {
     id: "zksync",
     name: "ZKsync Era",

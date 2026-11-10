@@ -1,23 +1,24 @@
 // One entry point for the CLI, the page and the tests: find the chain, read the facts, give the verdict.
 import { CHAINS } from "./chains.js";
-import { makeRpc, makeBridgeApi } from "./rpc.js";
+import { makeRpc, makeBridgeApi, makePolygonProofApi } from "./rpc.js";
 import { readFacts as readOpStack } from "./opstack.js";
 import { readFacts as readBlast } from "./blast.js";
 import { readFacts as readArbitrum, claimOf as claimOfArbitrum } from "./arbitrum.js";
 import { readFacts as readLinea } from "./linea.js";
 import { readFacts as readMorph } from "./morph.js";
 import { readFacts as readScroll } from "./scroll.js";
+import { readFacts as readPolygonZkevm } from "./polygonzkevm.js";
 import { readFacts as readZksync, claimOf as claimOfZksync } from "./zksync.js";
 import { verdict } from "./verdict.js";
 
 export function clientsFor(chain, opts = {}) {
   const clients = { l1: makeRpc(chain.l1Rpcs, opts), l2: makeRpc(chain.l2Rpcs, opts) };
   if (chain.l1ArchiveRpcs) clients.l1Archive = makeRpc(chain.l1ArchiveRpcs, opts);
-  if (chain.bridgeApi) clients.api = makeBridgeApi(chain.bridgeApi, opts);
+  if (chain.bridgeApi) clients.api = (chain.stack === "polygonzkevm" ? makePolygonProofApi : makeBridgeApi)(chain.bridgeApi, opts);
   return clients;
 }
 
-const READERS = { op: readOpStack, blast: readBlast, arbitrum: readArbitrum, linea: readLinea, morph: readMorph, scroll: readScroll, zksync: readZksync };
+const READERS = { op: readOpStack, blast: readBlast, arbitrum: readArbitrum, linea: readLinea, morph: readMorph, scroll: readScroll, polygonzkevm: readPolygonZkevm, zksync: readZksync };
 // The slow "who sent the last step" searches, run after the verdict when the page asks for deferExtras.
 const CLAIMERS = { arbitrum: claimOfArbitrum, zksync: claimOfZksync };
 

@@ -88,6 +88,28 @@ export function makeBridgeApi(base, { fetch: doFetch = globalThis.fetch, timeout
   };
 }
 
+/**
+ * A client for Polygon's public AggLayer proof API (api-gateway.polygon.technology), over plain fetch (works in a
+ * browser and in Node). For a zkEVM->L1 withdrawal it returns the two depth-32 Merkle proofs plus the exit roots:
+ * GET /api/v3/proof/mainnet/merkle-proof?networkId=1&depositCount=N -> {proof:{merkle_proof[32], rollup_merkle_proof[32],
+ * main_exit_root, rollup_exit_root}}. Keyless and CORS-open (access-control-allow-origin: *, verified 10 Nov 2026); the
+ * reader re-folds the proofs to the on-chain global exit root before trusting them, so the API only says which roots to
+ * check. A 404 means the deposit is not verified on L1 yet (null); any other non-OK (incl. a 503 backend outage) throws,
+ * so the reader reports "could not check" rather than silently treating it as "not finalized".
+ */
+export function makePolygonProofApi(base, { fetch: doFetch = globalThis.fetch, timeoutMs = 20_000 } = {}) {
+  return async function proof(depositCount) {
+    const res = await doFetch(`${base}/api/v3/proof/mainnet/merkle-proof?networkId=1&depositCount=${depositCount}`, {
+      headers: { accept: "application/json" },
+      signal: AbortSignal.timeout(timeoutMs),
+    });
+    if (res.status === 404) return null; // not indexed / not verified on L1 yet
+    if (!res.ok) throw new RpcError(`proof API HTTP ${res.status}`);
+    const body = await res.json();
+    return body?.proof ?? null;
+  };
+}
+
 /** Record / replay the bridge-API client, keyed on the transaction hash, so the tests run offline on a real answer. */
 export function recordingApi(fn, store) {
   return async (txHash) => {

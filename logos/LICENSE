@@ -5,6 +5,8 @@ blast, ink, mode, soneium, unichain, worldchain (world) and zora .svg: that vers
 (published as JS modules; the SVG text is taken from them unmodified).
 scroll.svg: dist/svgs/networks/branded/scroll.svg from @web3icons/core 4.0.58 (published as a JS module; the SVG text
 is taken from it unmodified).
+polygonzkevm.svg: src/svgs/networks/branded/polygon-zkevm.svg from the web3icons repo (0xa3k5/web3icons, MIT),
+unmodified; renamed to match the chain id.
 https://github.com/0xa3k5/web3icons
 
 MIT License

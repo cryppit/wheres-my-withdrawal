@@ -4,8 +4,8 @@ Paste the L2 transaction that started a withdrawal to Ethereum. It tells you, fr
 
 - whether the withdrawal is done, waiting (and until when), or missing a step;
 - which step is missing (prove or finalize on the OP Stack chains and Blast, claim on Arbitrum One, Robinhood Chain,
-  Linea and Scroll, finalize on ZKsync Era) and the exact contract call;
-- who may take that step. On all fifteen chains that is **anyone**, and the money still goes only to the withdrawal's
+  Linea, Scroll and Polygon zkEVM, finalize on ZKsync Era) and the exact contract call;
+- who may take that step. On all sixteen chains that is **anyone**, and the money still goes only to the withdrawal's
   recipient. On ZKsync Era a batch finalizer usually takes it without the owner doing anything;
 - who proved or claimed it, if someone else did. Third parties now prove and finish old withdrawals for others, and some
   then ask the owner for a tip. Nothing is owed: the funds arrive at the recipient either way.
@@ -15,7 +15,7 @@ It never asks for keys, never connects a wallet and never signs anything.
 Supported now: **OP Mainnet** (including withdrawals started before the Bedrock upgrade of 6 June 2023), **Base**,
 **Unichain**, **Ink**, **Soneium**, **World Chain**, **Mode**, **Zora**, **Blast** (its own portal, below), **Arbitrum One**
 (Nitro withdrawals, since 31 Aug 2022), **Robinhood Chain** (since its mainnet, 1 Jul 2026), **Linea**, **ZKsync Era**
-(withdrawals through the ZKsync bridge), **Morph** (status only, below) and **Scroll** (full claim, below).
+(withdrawals through the ZKsync bridge), **Morph** (status only, below), **Scroll** (full claim, below) and **Polygon zkEVM** (LxLy unified bridge, full claim, below).
 
 Morph is a Scroll-style rollup. For it this tool tracks the status of a withdrawal — initiated, posted to Ethereum,
 inside the challenge period (with the time left), ready to claim, or claimed — but does **not** build the claim. The
@@ -32,6 +32,17 @@ but trusts it only after re-folding it on chain to `ScrollChain.withdrawRoots(ba
 `isBatchFinalized`; the API only says which batch to check. Scroll finalizes with validity proofs (no challenge delay),
 so a batch is final the moment its proof is verified. A done claim is `isL2MessageExecuted(hash)` true.
 
+Polygon zkEVM is its own family — the Polygon/AggLayer **LxLy unified bridge**, not OP Stack and not Scroll-style. The
+PolygonZkEVMBridgeV2 is the same contract address on L1 and L2. A withdrawal is a `BridgeEvent` whose leaf is in the
+rollup's local exit tree; a validity (zk) proof verified on L1 by the PolygonRollupManager records the new rollup exit
+root as a global exit root in the GER (no challenge delay). Like Scroll, Polygon runs a public, keyless, CORS-open proof
+API, so this tool builds the **full** claim — `PolygonZkEVMBridgeV2.claimAsset(...)` with the two depth-32 Merkle
+proofs — as an unsigned transaction. It fetches the proofs from the API but trusts them only after re-folding them on
+chain (leaf → local exit root → rollup exit root, both folds matching the bridge's own `calculateRoot` on chain) AND
+confirming that global exit root is recorded on L1 (`globalExitRootMap != 0`, the same check `claimAsset` makes). If the
+proof API is unreachable, the tool says WAITING rather than guess "claimable". A done claim is
+`isClaimed(depositCount, 1)` true; the unified bridge does not index claims per withdrawal, so the claimer is not named.
+
 Blast keeps the OP Stack's older portal (1.10.0): withdrawals are proven against an L2OutputOracle output, finalize one
 day later, and only one proof per withdrawal counts. ETH withdrawals also pass through Blast's ETH yield manager:
 finalize needs the queue's checkpoint hint, which the check reads and puts in the call. USDB comes back as a DAI claim
@@ -44,7 +55,7 @@ Node 22 or later, no dependencies.
 ```sh
 node cli.js 0x<L2 tx hash>                 # finds the chain itself
 node cli.js 0x<L2 tx hash> --chain base    # or name it: op, base, unichain, ink, soneium, worldchain, mode, zora,
-                                           # blast, arb, robinhood, linea, zksync
+                                           # blast, arb, robinhood, linea, zksync, polygonzkevm
 node cli.js 0x<L2 tx hash> --json          # every fact behind the answer
 npm test                                   # replays recorded real withdrawals, no network
 ```
@@ -70,9 +81,9 @@ Public L2 endpoints serve proofs only for recent blocks (mainnet.optimism.io: 10
 recent game rather than an old resolved one; the proof stays valid after that window.
 
 
-## Build the claim step yourself (Arbitrum One, Robinhood Chain, Linea, Scroll)
+## Build the claim step yourself (Arbitrum One, Robinhood Chain, Linea, Scroll, Polygon zkEVM)
 
-`node cli.js <L2 tx hash> --claim --chain arb|robinhood|linea|scroll [--from 0x…]` builds the claim from what the check
+`node cli.js <L2 tx hash> --claim --chain arb|robinhood|linea|scroll|polygonzkevm [--from 0x…]` builds the claim from what the check
 reads and rehearses it with `eth_call`, read-only:
 
 - Arbitrum One and Robinhood Chain: `Outbox.executeTransaction` with the proof from `NodeInterface.constructOutboxProof`,
@@ -82,6 +93,9 @@ reads and rehearses it with `eth_call`, read-only:
   message fee (most withdrawals pay none) goes to whoever sends the claim;
 - Scroll: `L1ScrollMessenger.relayMessageWithProof` with the finalized Merkle proof from Scroll's bridge-history API,
   used only when that proof folds to `ScrollChain.withdrawRoots(batchIndex)` on chain and the batch is finalized.
+- Polygon zkEVM: `PolygonZkEVMBridgeV2.claimAsset` with the two depth-32 Merkle proofs from Polygon's AggLayer proof API,
+  used only when they re-fold (leaf → local exit root → rollup exit root) to the API's rollup exit root AND that global
+  exit root is recorded on L1 (`globalExitRootMap != 0`) — the same check the bridge makes before paying out.
 
 It refuses a withdrawal that is not ready to claim. Anyone can send the printed call from their own wallet; the funds go
 only to the withdrawal's recipient.
@@ -107,6 +121,7 @@ ZK rollups: there is no challenge window, only the wait for the L1 to finalize o
 | Robinhood Chain | BoLD assertions, as on Arbitrum One, from a validator whitelist (`validatorWhitelistDisabled()` is false) | as on Arbitrum One | 45,818 L1 blocks (about 6.4 days) after the assertion; assertions come about every 30 minutes (measured 26 Oct 2026) | none |
 | Linea | ZK validity proofs; the L1 rollup finalizes L2 blocks (no prove step for the user) | the rollup's `currentL2BlockNumber()` ≥ the withdrawal's L2 block | until that block is finalized: 1.8 to 3.3 hours in reads on 24 Oct 2026 | messages from before L2 block 2,242,568 (Feb 2024) use the legacy `claimMessage`; nothing expires on chain, but the bridge app stops listing a withdrawal after 90 days |
 | ZKsync Era | ZK validity proofs; batches are committed, proven and executed on L1 | the withdrawal's batch is ≤ `getTotalBatchesExecuted()` on the Era diamond | until the batch is executed: 3 hours at least (`executionDelay`), about 24 hours after commit in October 2026 | withdrawals finalized before the shared bridge (2024) are recorded on the Era diamond or the legacy ERC-20 bridge |
+| Polygon zkEVM | ZK validity proofs on the LxLy unified bridge; a batch is verified on L1 by the PolygonRollupManager, which records a global exit root | the global exit root over `keccak(mainnetExitRoot, rollupExitRoot)` is recorded in the GER (`globalExitRootMap != 0`), confirmed by re-folding the proof | until the batch is verified on L1 (no challenge delay); validity proofs carry no fixed wait | the L2 chain is wound down (blocks frozen ~July 2026) but L1 claims still work; `claimAsset` has no sender restriction |
 | Morph | Optimistic; sequencers commit each batch's withdraw-tree root to the Rollup, which finalizes it after a challenge period (status only — claim handed off to Morph's bridge app) | the batch whose last L2 block ≥ the withdrawal's block is finalized (`batchDataStore(lastFinalizedBatchIndex).blockNumber`); claimed when `finalizedWithdrawals(hash)` is true on the L1 messenger | `Rollup.finalizationPeriodSeconds()`, read live: 172,800 s (2 days) on mainnet, 10 Nov 2026 (7 days on the Holesky testnet) | none: a finalized withdrawal stays claimable indefinitely |
 | Scroll | ZK validity proofs; sequencers commit each batch's withdraw-tree root to the ScrollChain rollup and finalize it with a proof (no challenge delay — full claim built from the bridge-history proof) | the batch from Scroll's proof API is finalized (`isBatchFinalized`) **and** the API Merkle proof folds to `ScrollChain.withdrawRoots(batchIndex)`; claimed when `isL2MessageExecuted(hash)` is true on the L1 messenger | until the batch is finalized on L1: no fixed wait (validity-proof finality, usually within the hour); `ScrollChain` has no `finalizationPeriodSeconds()` | none: a finalized withdrawal stays claimable indefinitely |
 

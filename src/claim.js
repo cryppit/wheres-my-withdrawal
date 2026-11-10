@@ -66,7 +66,7 @@ export function encodeScrollClaim(proof, w) {
  * error object when the check says it is not ready, or when the proof the endpoints gave did not check out.
  */
 export async function buildClaim(chain, txHash, { index = 0, from = "0x000000000000000000000000000000000000dEaD", clients = (c) => clientsFor(c), doFetch } = {}) {
-  if (!["arbitrum", "linea", "scroll"].includes(chain.stack)) return { error: "bad-chain", message: "The claim builder works on Arbitrum One, Robinhood Chain, Linea and Scroll." };
+  if (!["arbitrum", "linea", "scroll", "polygonzkevm"].includes(chain.stack)) return { error: "bad-chain", message: "The claim builder works on Arbitrum One, Robinhood Chain, Linea, Scroll and Polygon zkEVM." };
   const r = await check(txHash, { chain: chain.id, index, clients });
   if (r.error) return r;
   const { facts: f, verdict: v } = r;
@@ -81,6 +81,10 @@ export async function buildClaim(chain, txHash, { index = 0, from = "0x000000000
     if (!f.proof?.rootConfirmed) return { error: "bad-proof", message: "Scroll's proof did not fold to the on-chain withdraw root for this withdrawal." };
     to = f.contracts.l1Messenger;
     data = encodeScrollClaim(f.proof, f.withdrawal);
+  } else if (chain.stack === "polygonzkevm") {
+    if (!f.proof?.rootConfirmed) return { error: "bad-proof", message: "Polygon's proof did not fold to a rollup exit root recorded on Ethereum for this withdrawal." };
+    to = f.contracts.bridge;
+    data = encodePolygonClaim(f.proof, f.withdrawal);
   } else if (f.withdrawal.legacy) {
     to = f.contracts.rollup;
     data = encodeLineaLegacyClaim(f.withdrawal);
@@ -97,4 +101,24 @@ export async function buildClaim(chain, txHash, { index = 0, from = "0x000000000
     gas = est ? Number(BigInt(est)) : null;
   }
   return { withdrawal: f.withdrawal, asset: f.asset, verdict: v, call: { to, value: "0", data }, rehearsal: { from, ...rehearsal, gas } };
+}
+
+/**
+ * PolygonZkEVMBridgeV2.claimAsset(bytes32[32] smtProofLocalExitRoot, bytes32[32] smtProofRollupExitRoot,
+ * uint256 globalIndex, bytes32 mainnetExitRoot, bytes32 rollupExitRoot, uint32 originNetwork, address originTokenAddress,
+ * uint32 destinationNetwork, address destinationAddress, uint256 amount, bytes metadata) — selector 0xccaa2d11. The two
+ * proofs are FIXED-size bytes32[32] arrays, so they are encoded inline (32 words each, no offset); metadata is the only
+ * dynamic argument, at head offset 73*32. Verified against the on-chain claimAsset ABI by an eth_call rehearsal of a
+ * real claimable withdrawal.
+ */
+export function encodePolygonClaim(proof, w) {
+  const arr = (hashes) => hashes.map(pad).join("");
+  const head = 73 * 32;
+  return (
+    selector("claimAsset(bytes32[32],bytes32[32],uint256,bytes32,bytes32,uint32,address,uint32,address,uint256,bytes)") +
+    arr(proof.smtProofLocalExitRoot) + arr(proof.smtProofRollupExitRoot) +
+    uint(proof.globalIndex) + pad(proof.mainnetExitRoot) + pad(proof.rollupExitRoot) +
+    uint(w.originNetwork) + pad(w.originAddress) + uint(w.destinationNetwork) + pad(w.destinationAddress) + uint(w.amount) +
+    uint(head) + bytesTail(w.metadata)
+  );
 }
