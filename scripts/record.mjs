@@ -3,7 +3,7 @@
 // Usage: node scripts/record.mjs <name> <chain> <L2 tx hash> [index]
 import { writeFileSync } from "node:fs";
 import { check, clientsFor } from "../src/check.js";
-import { recording } from "../src/rpc.js";
+import { recording, recordingApi } from "../src/rpc.js";
 import { CHAINS } from "../src/chains.js";
 import { renderText } from "../src/render.js";
 
@@ -12,12 +12,13 @@ if (!name || !CHAINS[chain] || !tx) {
   console.error("Usage: node scripts/record.mjs <name> <chain> <L2 tx hash> [index]");
   process.exit(2);
 }
-const store = { l1: {}, l2: {} };
+const store = { l1: {}, l2: {}, api: {} };
 const clients = (c) => {
   const live = clientsFor(c);
   // Archive reads share the L1 store: replays key on method and params, not on which endpoint answered.
   const rec = { l1: recording(live.l1, store.l1), l2: recording(live.l2, store.l2) };
   if (live.l1Archive) rec.l1Archive = recording(live.l1Archive, store.l1);
+  if (live.api) rec.api = recordingApi(live.api, store.api); // the bridge-history API, keyed on the tx hash
   return rec;
 };
 const r = await check(tx, { chain, index: Number(index), clients });

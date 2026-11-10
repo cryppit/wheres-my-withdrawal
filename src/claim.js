@@ -1,6 +1,6 @@
-// The claim step on Arbitrum One, Robinhood Chain and Linea, built from what the check already read: the exact call,
-// rehearsed with eth_call. Read-only: nothing is signed or sent; whoever sends the call pays only the gas, and the
-// funds still go only to the withdrawal's recipient.
+// The claim step on Arbitrum One, Robinhood Chain, Linea and Scroll, built from what the check already read: the exact
+// call, rehearsed with eth_call. Read-only: nothing is signed or sent; whoever sends the call pays only the gas, and
+// the funds still go only to the withdrawal's recipient.
 import { selector } from "./abi.js";
 import { check, clientsFor } from "./check.js";
 import { rehearse } from "./prove.js";
@@ -45,11 +45,28 @@ export function encodeLineaLegacyClaim(w) {
 }
 
 /**
+ * L1ScrollMessenger.relayMessageWithProof(from, to, value, nonce, message, (uint256 batchIndex, bytes merkleProof))
+ * (scroll-tech/scroll L1ScrollMessenger, selector 0xc311b6fc). `message` and the proof tuple are both dynamic; the
+ * tuple holds its batchIndex then an offset (0x40) to its merkleProof bytes. Verified by a successful eth_call
+ * rehearsal of a real claimable withdrawal on 10 Nov 2026.
+ */
+export function encodeScrollClaim(proof, w) {
+  const head = 6 * 32;
+  const msgEnc = bytesTail(w.message);
+  const proofTuple = uint(proof.batchIndex) + uint(0x40) + bytesTail(proof.merkleProof);
+  return (
+    selector("relayMessageWithProof(address,address,uint256,uint256,bytes,(uint256,bytes))") +
+    pad(w.from) + pad(w.to) + uint(w.value) + uint(w.nonce) +
+    uint(head) + uint(head + msgEnc.length / 2) + msgEnc + proofTuple
+  );
+}
+
+/**
  * The claim call for a withdrawal that is ready to claim, rehearsed from `from` (any account works). Returns an
  * error object when the check says it is not ready, or when the proof the endpoints gave did not check out.
  */
 export async function buildClaim(chain, txHash, { index = 0, from = "0x000000000000000000000000000000000000dEaD", clients = (c) => clientsFor(c), doFetch } = {}) {
-  if (chain.stack !== "arbitrum" && chain.stack !== "linea") return { error: "bad-chain", message: "The claim builder works on Arbitrum One, Robinhood Chain and Linea." };
+  if (!["arbitrum", "linea", "scroll"].includes(chain.stack)) return { error: "bad-chain", message: "The claim builder works on Arbitrum One, Robinhood Chain, Linea and Scroll." };
   const r = await check(txHash, { chain: chain.id, index, clients });
   if (r.error) return r;
   const { facts: f, verdict: v } = r;
@@ -60,6 +77,10 @@ export async function buildClaim(chain, txHash, { index = 0, from = "0x000000000
     if (!f.proof?.leafMatches || !f.proof?.rootConfirmed) return { error: "bad-proof", message: "The outbox proof from the L2 endpoint did not check out against this withdrawal and the Outbox's confirmed roots." };
     to = f.contracts.outbox;
     data = encodeArbitrumClaim(f.proof.hashes, f.withdrawal);
+  } else if (chain.stack === "scroll") {
+    if (!f.proof?.rootConfirmed) return { error: "bad-proof", message: "Scroll's proof did not fold to the on-chain withdraw root for this withdrawal." };
+    to = f.contracts.l1Messenger;
+    data = encodeScrollClaim(f.proof, f.withdrawal);
   } else if (f.withdrawal.legacy) {
     to = f.contracts.rollup;
     data = encodeLineaLegacyClaim(f.withdrawal);

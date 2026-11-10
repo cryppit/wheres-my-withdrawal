@@ -66,3 +66,41 @@ export function replaying(store) {
     return store[k];
   };
 }
+
+/**
+ * A client for a rollup's public bridge-history API, over plain fetch (works in a browser and in Node). Scroll serves
+ * each withdrawal's finalized Merkle proof here; the reader re-folds that proof to the on-chain withdraw root before
+ * trusting it, so the API only says which batch to check. POST /api/txsbyhashes {txs:[hash]} -> the withdrawal's row,
+ * or null when the API does not know it yet. Keyless; the endpoint sends `access-control-allow-origin: *` (10 Nov 2026).
+ */
+export function makeBridgeApi(base, { fetch: doFetch = globalThis.fetch, timeoutMs = 20_000 } = {}) {
+  return async function claimInfo(txHash) {
+    const res = await doFetch(`${base}/api/txsbyhashes`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ txs: [txHash] }),
+      signal: AbortSignal.timeout(timeoutMs),
+    });
+    if (!res.ok) throw new RpcError(`bridge API HTTP ${res.status}`);
+    const body = await res.json();
+    const results = Array.isArray(body?.data?.results) ? body.data.results : [];
+    return results.find((r) => r.hash?.toLowerCase() === txHash.toLowerCase()) ?? results[0] ?? null;
+  };
+}
+
+/** Record / replay the bridge-API client, keyed on the transaction hash, so the tests run offline on a real answer. */
+export function recordingApi(fn, store) {
+  return async (txHash) => {
+    const r = await fn(txHash);
+    store[txHash.toLowerCase()] = r;
+    return r;
+  };
+}
+
+export function replayingApi(store) {
+  return async (txHash) => {
+    const k = txHash.toLowerCase();
+    if (!(k in store)) throw new RpcError(`not in fixture (api): ${k}`);
+    return store[k];
+  };
+}

@@ -230,6 +230,34 @@ export const CHAINS = {
     bridgeUrl: "https://bridge.morph.network",
     explorer: "https://explorer.morph.network/tx/",
   },
+  // Scroll is the ORIGINAL of the family Morph forked (its own L1/L2 contracts, NOT OP Stack). Every address below was
+  // verified on chain on 10 Nov 2026: L1ScrollMessenger.counterpart() names the L2ScrollMessenger and its rollup()
+  // names this ScrollChain; L2ScrollMessenger.counterpart() names this L1ScrollMessenger and its messageQueue() names
+  // the L2MessageQueue predeploy (0x5300…0000, the withdraw tree). Sources: scroll.io/docs contract addresses, cross-
+  // checked against each getter above — no blog trusted. Scroll finalizes with validity proofs: ScrollChain has no
+  // finalizationPeriodSeconds() (it reverts), so there is no challenge delay — a batch is final once isBatchFinalized
+  // and withdrawRoots(batchIndex) are set. The claim is relayMessageWithProof on the L1 messenger (selector 0xc311b6fc,
+  // confirmed by a successful eth_call rehearsal of a real claimable withdrawal); a done claim is isL2MessageExecuted
+  // true. The Merkle proof comes from the public, keyless, CORS-open bridge-history API (bridgeApi below), and the
+  // reader re-folds it to the on-chain withdraw root before trusting it, so WMW builds the FULL claim here.
+  scroll: {
+    id: "scroll",
+    name: "Scroll",
+    stack: "scroll",
+    l2ChainId: 534352,
+    // rpc.scroll.io serves receipts, the predeploys and wide eth_getLogs ranges, with CORS (10 Nov 2026).
+    l2Rpcs: ["https://rpc.scroll.io"],
+    l1Rpcs: L1_RPCS,
+    l1ArchiveRpcs: L1_ARCHIVE_RPCS, // who sent the claim: a RelayedMessage log search over old L1 history
+    rollup: "0xa13baf47339d63b743e7da8741db5456dac1e556", // ScrollChain
+    l1Messenger: "0x6774bcbd5cecef1336b5300fb5186a12ddd8b367", // L1ScrollMessenger
+    l2Messenger: "0x781e90f1c8fc4611c9b7497c3b47f99ef6969cbc", // L2ScrollMessenger
+    l2MessageQueue: "0x5300000000000000000000000000000000000000", // L2MessageQueue (the withdraw tree / appendMessage)
+    // Scroll's public bridge-history API (v2). POST /api/txsbyhashes returns claim_info.proof {batch_index, merkle_proof}.
+    bridgeApi: "https://mainnet-api-bridge-v2.scroll.io",
+    bridgeUrl: "https://scroll.io/bridge",
+    explorer: "https://scrollscan.com/tx/",
+  },
   zksync: {
     id: "zksync",
     name: "ZKsync Era",

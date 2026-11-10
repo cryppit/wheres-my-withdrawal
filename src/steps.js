@@ -8,6 +8,7 @@ const STACKS = {
   arbitrum: ["Started", "Confirmed on Ethereum", "Claim"],
   linea: ["Started", "Confirmed on Ethereum", "Claim"],
   morph: ["Started", "Posted to Ethereum", "Challenge period", "Claim in Morph's bridge"],
+  scroll: ["Started", "Finalized on Ethereum", "Claim"],
   zksync: ["Started", "Confirmed on Ethereum", "Finalize"],
 };
 

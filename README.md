@@ -3,9 +3,9 @@
 Paste the L2 transaction that started a withdrawal to Ethereum. It tells you, from public RPCs only:
 
 - whether the withdrawal is done, waiting (and until when), or missing a step;
-- which step is missing (prove or finalize on the OP Stack chains and Blast, claim on Arbitrum One, Robinhood Chain and
-  Linea, finalize on ZKsync Era) and the exact contract call;
-- who may take that step. On all thirteen chains that is **anyone**, and the money still goes only to the withdrawal's
+- which step is missing (prove or finalize on the OP Stack chains and Blast, claim on Arbitrum One, Robinhood Chain,
+  Linea and Scroll, finalize on ZKsync Era) and the exact contract call;
+- who may take that step. On all fifteen chains that is **anyone**, and the money still goes only to the withdrawal's
   recipient. On ZKsync Era a batch finalizer usually takes it without the owner doing anything;
 - who proved or claimed it, if someone else did. Third parties now prove and finish old withdrawals for others, and some
   then ask the owner for a tip. Nothing is owed: the funds arrive at the recipient either way.
@@ -15,7 +15,7 @@ It never asks for keys, never connects a wallet and never signs anything.
 Supported now: **OP Mainnet** (including withdrawals started before the Bedrock upgrade of 6 June 2023), **Base**,
 **Unichain**, **Ink**, **Soneium**, **World Chain**, **Mode**, **Zora**, **Blast** (its own portal, below), **Arbitrum One**
 (Nitro withdrawals, since 31 Aug 2022), **Robinhood Chain** (since its mainnet, 1 Jul 2026), **Linea**, **ZKsync Era**
-(withdrawals through the ZKsync bridge) and **Morph** (status only, below).
+(withdrawals through the ZKsync bridge), **Morph** (status only, below) and **Scroll** (full claim, below).
 
 Morph is a Scroll-style rollup. For it this tool tracks the status of a withdrawal — initiated, posted to Ethereum,
 inside the challenge period (with the time left), ready to claim, or claimed — but does **not** build the claim. The
@@ -23,6 +23,14 @@ claim (`L1CrossDomainMessenger.proveAndRelayMessage`) needs a Merkle proof again
 Morph's bridge backend produces and that is not served by any public endpoint, so a ready-to-claim Morph withdrawal is
 handed off to Morph's bridge app (https://bridge.morph.network, under Transactions / Withdrawals) rather than turned
 into a half-built transaction.
+
+Scroll is the original of that family (Morph forked its bridge), and it has one advantage Morph does not: Scroll's
+public bridge-history API serves each withdrawal's finalized Merkle proof, keyless and CORS-open. So for Scroll this
+tool builds the **full** claim — `L1ScrollMessenger.relayMessageWithProof(from, to, value, nonce, message,
+(batchIndex, merkleProof))` — as an unsigned transaction the user signs themselves. It fetches the proof from the API
+but trusts it only after re-folding it on chain to `ScrollChain.withdrawRoots(batchIndex)` and confirming
+`isBatchFinalized`; the API only says which batch to check. Scroll finalizes with validity proofs (no challenge delay),
+so a batch is final the moment its proof is verified. A done claim is `isL2MessageExecuted(hash)` true.
 
 Blast keeps the OP Stack's older portal (1.10.0): withdrawals are proven against an L2OutputOracle output, finalize one
 day later, and only one proof per withdrawal counts. ETH withdrawals also pass through Blast's ETH yield manager:
@@ -62,16 +70,18 @@ Public L2 endpoints serve proofs only for recent blocks (mainnet.optimism.io: 10
 recent game rather than an old resolved one; the proof stays valid after that window.
 
 
-## Build the claim step yourself (Arbitrum One, Robinhood Chain, Linea)
+## Build the claim step yourself (Arbitrum One, Robinhood Chain, Linea, Scroll)
 
-`node cli.js <L2 tx hash> --claim --chain arb|robinhood|linea [--from 0x…]` builds the claim from what the check reads
-and rehearses it with `eth_call`, read-only:
+`node cli.js <L2 tx hash> --claim --chain arb|robinhood|linea|scroll [--from 0x…]` builds the claim from what the check
+reads and rehearses it with `eth_call`, read-only:
 
 - Arbitrum One and Robinhood Chain: `Outbox.executeTransaction` with the proof from `NodeInterface.constructOutboxProof`,
   used only when its leaf is this withdrawal and its root is one the Outbox confirmed;
 - Linea: `claimMessageWithProof` with the Merkle proof rebuilt from the L1 finalization, used only when its root is one
   that finalization added, or `claimMessage` for messages from before Alpha v2. The fee recipient is left empty, so a
-  message fee (most withdrawals pay none) goes to whoever sends the claim.
+  message fee (most withdrawals pay none) goes to whoever sends the claim;
+- Scroll: `L1ScrollMessenger.relayMessageWithProof` with the finalized Merkle proof from Scroll's bridge-history API,
+  used only when that proof folds to `ScrollChain.withdrawRoots(batchIndex)` on chain and the batch is finalized.
 
 It refuses a withdrawal that is not ready to claim. Anyone can send the printed call from their own wallet; the funds go
 only to the withdrawal's recipient.
@@ -98,6 +108,7 @@ ZK rollups: there is no challenge window, only the wait for the L1 to finalize o
 | Linea | ZK validity proofs; the L1 rollup finalizes L2 blocks (no prove step for the user) | the rollup's `currentL2BlockNumber()` ≥ the withdrawal's L2 block | until that block is finalized: 1.8 to 3.3 hours in reads on 24 Oct 2026 | messages from before L2 block 2,242,568 (Feb 2024) use the legacy `claimMessage`; nothing expires on chain, but the bridge app stops listing a withdrawal after 90 days |
 | ZKsync Era | ZK validity proofs; batches are committed, proven and executed on L1 | the withdrawal's batch is ≤ `getTotalBatchesExecuted()` on the Era diamond | until the batch is executed: 3 hours at least (`executionDelay`), about 24 hours after commit in October 2026 | withdrawals finalized before the shared bridge (2024) are recorded on the Era diamond or the legacy ERC-20 bridge |
 | Morph | Optimistic; sequencers commit each batch's withdraw-tree root to the Rollup, which finalizes it after a challenge period (status only — claim handed off to Morph's bridge app) | the batch whose last L2 block ≥ the withdrawal's block is finalized (`batchDataStore(lastFinalizedBatchIndex).blockNumber`); claimed when `finalizedWithdrawals(hash)` is true on the L1 messenger | `Rollup.finalizationPeriodSeconds()`, read live: 172,800 s (2 days) on mainnet, 10 Nov 2026 (7 days on the Holesky testnet) | none: a finalized withdrawal stays claimable indefinitely |
+| Scroll | ZK validity proofs; sequencers commit each batch's withdraw-tree root to the ScrollChain rollup and finalize it with a proof (no challenge delay — full claim built from the bridge-history proof) | the batch from Scroll's proof API is finalized (`isBatchFinalized`) **and** the API Merkle proof folds to `ScrollChain.withdrawRoots(batchIndex)`; claimed when `isL2MessageExecuted(hash)` is true on the L1 messenger | until the batch is finalized on L1: no fixed wait (validity-proof finality, usually within the hour); `ScrollChain` has no `finalizationPeriodSeconds()` | none: a finalized withdrawal stays claimable indefinitely |
 
 For each OP Mainnet or Base withdrawal it reads, at the latest **finalized** Ethereum block:
 
@@ -207,8 +218,9 @@ path (34 hashes instead of 16 for a Gateway batch), and the dry run checks it on
 Public JSON-RPC endpoints without keys, tried in order: the chains' own RPCs and PublicNode for OP Mainnet and Base;
 arb1.arbitrum.io, Blast's public endpoint and Nodies for Arbitrum One; rpc.mainnet.chain.robinhood.com for Robinhood
 Chain (the only keyless one); rpc.linea.build and PublicNode for Linea;
-mainnet.era.zksync.io for ZKsync Era (the `zks_` methods have no other keyless endpoint); PublicNode and MEV Blocker for
-Ethereum. All of them answer browsers (CORS). The lookups that reach back days or years (an Arbitrum assertion created
+mainnet.era.zksync.io for ZKsync Era (the `zks_` methods have no other keyless endpoint); rpc.scroll.io for Scroll,
+plus Scroll's public bridge-history API (mainnet-api-bridge-v2.scroll.io) for the finalized withdraw proof; PublicNode
+and MEV Blocker for Ethereum. All of them answer browsers (CORS). The lookups that reach back days or years (an Arbitrum assertion created
 about 6.4 days ago, the block a claim or finalization happened in, a Linea finalization from 2024) need historical logs
 and state, which PublicNode's free tier refuses. Arbitrum and ZKsync send those straight to MEV Blocker, then Tenderly's
 public gateway; Linea reaches MEV Blocker after PublicNode refuses. With "Find chain", every L2 is asked at once and

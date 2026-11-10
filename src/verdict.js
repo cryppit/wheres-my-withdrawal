@@ -29,6 +29,7 @@ export function verdict(f) {
   if (f.stack === "arbitrum") return arbitrumVerdict(f);
   if (f.stack === "linea") return lineaVerdict(f);
   if (f.stack === "morph") return morphVerdict(f);
+  if (f.stack === "scroll") return scrollVerdict(f);
   if (f.stack === "zksync") return zksyncVerdict(f);
   if (f.stack === "blast") return blastVerdict(f);
   const t = f.l1.timestamp;
@@ -315,6 +316,50 @@ function morphVerdict(f) {
   return {
     state: "WAITING_FOR_BATCH", eta: null, who: null, notes, action: null,
     summary: `Waiting for Morph to post the batch with this withdrawal to Ethereum, then out its ${days}-day challenge period. After that it can be claimed in Morph's bridge app.`,
+  };
+}
+
+/**
+ * Scroll (the original of Morph's family). A withdrawal is a SentMessage whose hash is appended to the L2 withdraw
+ * tree; sequencers commit each batch to the ScrollChain rollup and finalize it with a validity proof — there is NO
+ * challenge delay. The claim is relayMessageWithProof on the L1 messenger; unlike Morph, Scroll's public bridge-history
+ * API serves the Merkle proof, which the reader re-folds to the on-chain withdraw root, so a claimable withdrawal is a
+ * FULL claim (an unsigned relayMessageWithProof call), not a handoff. isL2MessageExecuted(hash) is the done flag.
+ */
+function scrollVerdict(f) {
+  const notes = [];
+  if (!f.hashVerified) notes.push("We couldn't match this withdrawal to its entry in Scroll's withdraw tree from the free endpoints. Check again before anyone acts on it.");
+  const tx = `(${f.withdrawal.hash})`;
+
+  if (f.claimed) {
+    if (isThirdParty(f.claim, f.asset)) notes.push(thirdPartyNote("claim"));
+    if (!f.claim && f.claimLookup) notes.push("We couldn't find who sent the claim: the free data sources didn't return it. The money still went to the recipient.");
+    return {
+      state: "CLAIMED", eta: null, who: null, action: null, notes, claim: f.claim,
+      summary: "Claimed on Ethereum. The money went to the recipient; nothing is left to do.",
+    };
+  }
+
+  if (f.finalized) {
+    // finalized is set only when the batch is finalized on chain AND the API proof folds to its on-chain withdraw
+    // root, so the claim here is a real, checkable call, not a hint.
+    const proof = f.proof ? `{batchIndex: ${f.proof.batchIndex}, merkleProof: ${f.proof.hashes.length} nodes}` : "{batchIndex, merkleProof from Scroll's proof API}";
+    return {
+      state: "READY_TO_CLAIM", eta: null, who: "anyone", notes,
+      action: `L1ScrollMessenger.relayMessageWithProof(${f.withdrawal.from}, ${f.withdrawal.to}, ${f.withdrawal.value}, ${f.withdrawal.nonce}, message ${tx}, ${proof})`,
+      summary: "Confirmed on Ethereum and ready to claim. Anyone can send the claim; the money goes only to the withdrawal's recipient. Nothing claims it automatically.",
+    };
+  }
+
+  // Not finalized. Scroll proves each batch valid (no fixed challenge wait), so there is no ETA to promise.
+  if (f.proof && f.batch && !f.batch.finalized) {
+    // The API gave a proof but the batch is not finalized yet (or the proof did not fold to the on-chain root).
+    if (!f.proof.rootConfirmed) notes.push("Scroll's proof service returned a proof that did not fold to the on-chain withdraw root yet; it will once the batch is finalized. Nothing to do until then.");
+  }
+  if (f.proofLookup === "failed") notes.push("We couldn't reach Scroll's proof service to check whether this is ready to claim yet. The withdrawal is safe; try again in a minute.");
+  return {
+    state: "WAITING_FOR_FINALIZATION", eta: null, who: null, notes, action: null,
+    summary: "Waiting for Scroll to finalize the batch with this withdrawal on Ethereum. Scroll proves each batch valid rather than waiting out a challenge period, so there is no fixed wait. After that anyone can claim it; nothing claims it automatically.",
   };
 }
 
