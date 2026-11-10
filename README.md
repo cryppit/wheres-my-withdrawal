@@ -4,8 +4,8 @@ Paste the L2 transaction that started a withdrawal to Ethereum. It tells you, fr
 
 - whether the withdrawal is done, waiting (and until when), or missing a step;
 - which step is missing (prove or finalize on the OP Stack chains and Blast, claim on Arbitrum One, Robinhood Chain,
-  Linea, Scroll and Polygon zkEVM, finalize on ZKsync Era) and the exact contract call;
-- who may take that step. On all sixteen chains that is **anyone**, and the money still goes only to the withdrawal's
+  Linea, Scroll, Polygon zkEVM and Taiko, finalize on ZKsync Era) and the exact contract call;
+- who may take that step. On all seventeen chains that is **anyone**, and the money still goes only to the withdrawal's
   recipient. On ZKsync Era a batch finalizer usually takes it without the owner doing anything;
 - who proved or claimed it, if someone else did. Third parties now prove and finish old withdrawals for others, and some
   then ask the owner for a tip. Nothing is owed: the funds arrive at the recipient either way.
@@ -15,7 +15,7 @@ It never asks for keys, never connects a wallet and never signs anything.
 Supported now: **OP Mainnet** (including withdrawals started before the Bedrock upgrade of 6 June 2023), **Base**,
 **Unichain**, **Ink**, **Soneium**, **World Chain**, **Mode**, **Zora**, **Blast** (its own portal, below), **Arbitrum One**
 (Nitro withdrawals, since 31 Aug 2022), **Robinhood Chain** (since its mainnet, 1 Jul 2026), **Linea**, **ZKsync Era**
-(withdrawals through the ZKsync bridge), **Morph** (status only, below), **Scroll** (full claim, below) and **Polygon zkEVM** (LxLy unified bridge, full claim, below).
+(withdrawals through the ZKsync bridge), **Morph** (status only, below), **Scroll** (full claim, below), **Polygon zkEVM** (LxLy unified bridge, full claim, below) and **Taiko Alethia** (based rollup, SignalService + Bridge, full claim, below).
 
 Morph is a Scroll-style rollup. For it this tool tracks the status of a withdrawal — initiated, posted to Ethereum,
 inside the challenge period (with the time left), ready to claim, or claimed — but does **not** build the claim. The
@@ -43,6 +43,21 @@ confirming that global exit root is recorded on L1 (`globalExitRootMap != 0`, th
 proof API is unreachable, the tool says WAITING rather than guess "claimable". A done claim is
 `isClaimed(depositCount, 1)` true; the unified bridge does not index claims per withdrawal, so the claimer is not named.
 
+Taiko Alethia (L2 chain 167000) is its own family too — a **based rollup** on a **SignalService + Bridge**, not OP
+Stack, not Scroll-style and not the LxLy bridge. A withdrawal is a `MessageSent(msgHash, Message)` from the L2 Bridge
+with `destChainId == 1`; sending it stored `msgHash` as a signal in the L2 SignalService. TaikoInbox proves each L2
+batch with a validity proof and **syncs that batch's L2 state root to the L1 SignalService as a checkpoint**
+(`getCheckpoint(blockNumber) → blockHash, stateRoot`), with no challenge delay. The claim is
+`Bridge.processMessage(Message, bytes proof)` on the L1 Bridge, where `proof` is one `HopProof` carrying a
+Merkle-Patricia proof of the signal slot. That proof is a plain `eth_getProof` of an L2 storage slot, so this tool
+rebuilds it **keyless from the browser** — no bridge API — and builds the **full** claim. It trusts the proof only
+after re-folding **both** legs on chain: the storage proof to the signal slot's value (which must be the `msgHash`) and
+the account proof to the state root TaikoInbox synced to L1 (the checkpoint's `stateRoot`). That synced-root re-fold is
+the guard: a withdrawal is never called claimable unless its signal proves against a state root Ethereum holds. Taiko
+finalizes with validity proofs (no fixed wait), so there is no ETA to promise. A done claim is
+`messageStatus(msgHash) == DONE`; the claimer is named from the `MessageStatusChanged` log. A message that was delivered
+but is RETRIABLE or FAILED is shown as "needs resending" (anyone can `retryMessage`), never as a fresh claim.
+
 Blast keeps the OP Stack's older portal (1.10.0): withdrawals are proven against an L2OutputOracle output, finalize one
 day later, and only one proof per withdrawal counts. ETH withdrawals also pass through Blast's ETH yield manager:
 finalize needs the queue's checkpoint hint, which the check reads and puts in the call. USDB comes back as a DAI claim
@@ -55,7 +70,7 @@ Node 22 or later, no dependencies.
 ```sh
 node cli.js 0x<L2 tx hash>                 # finds the chain itself
 node cli.js 0x<L2 tx hash> --chain base    # or name it: op, base, unichain, ink, soneium, worldchain, mode, zora,
-                                           # blast, arb, robinhood, linea, zksync, polygonzkevm
+                                           # blast, arb, robinhood, linea, zksync, polygonzkevm, taiko
 node cli.js 0x<L2 tx hash> --json          # every fact behind the answer
 npm test                                   # replays recorded real withdrawals, no network
 ```
@@ -81,9 +96,9 @@ Public L2 endpoints serve proofs only for recent blocks (mainnet.optimism.io: 10
 recent game rather than an old resolved one; the proof stays valid after that window.
 
 
-## Build the claim step yourself (Arbitrum One, Robinhood Chain, Linea, Scroll, Polygon zkEVM)
+## Build the claim step yourself (Arbitrum One, Robinhood Chain, Linea, Scroll, Polygon zkEVM, Taiko)
 
-`node cli.js <L2 tx hash> --claim --chain arb|robinhood|linea|scroll|polygonzkevm [--from 0x…]` builds the claim from what the check
+`node cli.js <L2 tx hash> --claim --chain arb|robinhood|linea|scroll|polygonzkevm|taiko [--from 0x…]` builds the claim from what the check
 reads and rehearses it with `eth_call`, read-only:
 
 - Arbitrum One and Robinhood Chain: `Outbox.executeTransaction` with the proof from `NodeInterface.constructOutboxProof`,
@@ -96,6 +111,10 @@ reads and rehearses it with `eth_call`, read-only:
 - Polygon zkEVM: `PolygonZkEVMBridgeV2.claimAsset` with the two depth-32 Merkle proofs from Polygon's AggLayer proof API,
   used only when they re-fold (leaf → local exit root → rollup exit root) to the API's rollup exit root AND that global
   exit root is recorded on L1 (`globalExitRootMap != 0`) — the same check the bridge makes before paying out.
+- Taiko: `Bridge.processMessage(Message, proof)` with the `HopProof` rebuilt from `eth_getProof` of the signal slot on
+  L2, used only when both legs re-fold on chain — the storage proof to the slot's value (the `msgHash`) and the account
+  proof to the state root TaikoInbox synced to L1 (`getCheckpoint(blockNumber).stateRoot`). No bridge API is needed; the
+  proof comes from public chain data. (A real such claim rehearsed on L1 at ~741k gas on 10 Nov 2026.)
 
 It refuses a withdrawal that is not ready to claim. Anyone can send the printed call from their own wallet; the funds go
 only to the withdrawal's recipient.

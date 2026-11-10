@@ -31,6 +31,7 @@ export function verdict(f) {
   if (f.stack === "morph") return morphVerdict(f);
   if (f.stack === "scroll") return scrollVerdict(f);
   if (f.stack === "polygonzkevm") return polygonzkevmVerdict(f);
+  if (f.stack === "taiko") return taikoVerdict(f);
   if (f.stack === "zksync") return zksyncVerdict(f);
   if (f.stack === "blast") return blastVerdict(f);
   const t = f.l1.timestamp;
@@ -444,5 +445,65 @@ function polygonzkevmVerdict(f) {
   return {
     state: "WAITING_FOR_FINALIZATION", eta: null, who: null, action: null, notes,
     summary: "Waiting for Polygon to verify the batch with this withdrawal on Ethereum. Polygon proves each batch valid with a zk proof rather than waiting out a challenge period, so there is no fixed wait. After that anyone can claim it; nothing claims it automatically.",
+  };
+}
+
+/**
+ * Taiko Alethia (a based validity rollup on a SignalService + Bridge). A withdrawal is a MessageSent whose msgHash is
+ * stored as a signal in the L2 SignalService; TaikoInbox proves each L2 batch and syncs its state root to the L1
+ * SignalService as a checkpoint (no challenge delay). The claim is processMessage on the L1 Bridge, whose signal proof
+ * is a plain eth_getProof the reader re-folds to the checkpoint's SYNCED state root — so a claimable withdrawal is a
+ * FULL claim, not a hand-off. messageStatus(msgHash) == DONE is the done flag; RETRIABLE means it was delivered but
+ * the final call failed and can be retried.
+ */
+function taikoVerdict(f) {
+  const notes = [];
+  if (!f.hashVerified) notes.push("We couldn't match this withdrawal to its own message hash from the free endpoints. Check again before anyone acts on it.");
+  const tx = `(${f.withdrawal.hash})`;
+
+  if (f.claimed) {
+    if (isThirdParty(f.claim, f.asset)) notes.push(thirdPartyNote("claim"));
+    if (!f.claim && f.claimLookup) notes.push("We couldn't find who sent the claim: the free data sources didn't return it. The money still went to the recipient.");
+    return {
+      state: "CLAIMED", eta: null, who: null, action: null, notes, claim: f.claim,
+      summary: "Claimed on Ethereum. The money went to the recipient; nothing is left to do.",
+    };
+  }
+
+  if (f.status === 1 /* RETRIABLE */ || f.status === 3 /* FAILED */) {
+    return {
+      state: "RELAY_FAILED", eta: null, who: "anyone", notes,
+      action: `Bridge.retryMessage(message ${tx}, isLastAttempt) on the L1 Bridge`,
+      summary: "Delivered to Ethereum, but the final step failed and needs to be sent again. The money is held safely on Ethereum and anyone can retry it; it still goes only to the recipient.",
+    };
+  }
+
+  if (f.status === 4 /* RECALLED */) {
+    notes.push("This withdrawal was recalled: the sender took the funds back on Taiko, so there is nothing to claim on Ethereum.");
+    return {
+      state: "CLAIMED", eta: null, who: null, action: null, notes, claim: null,
+      summary: "Recalled. The sender took the funds back on Taiko; there is nothing left to do on Ethereum.",
+    };
+  }
+
+  if (f.finalized) {
+    // finalized is set only when the signal proof folds to the L2 state root TaikoInbox synced to L1, so the claim here
+    // is a real, checkable call, not a hint.
+    const proof = f.proof ? `{blockId: ${f.proof.blockId}, rootHash ${f.proof.rootHash}, account+storage proof}` : "{blockId, rootHash, proof from eth_getProof}";
+    return {
+      state: "READY_TO_CLAIM", eta: null, who: "anyone", notes,
+      action: `Bridge.processMessage(message ${tx}, ${proof}) on the L1 Bridge`,
+      summary: "Confirmed on Ethereum and ready to claim. Anyone can send the claim; the money goes only to the withdrawal's recipient. Nothing claims it automatically.",
+    };
+  }
+
+  // Not done. Taiko finalizes with validity proofs (no fixed challenge wait), so there is no ETA to promise. Two
+  // reasons it is not claimable yet: no synced checkpoint reaches this withdrawal's block, or the proof didn't confirm.
+  if (f.checkpoint && !f.checkpoint.coversWithdrawal) notes.push("Taiko has synced a state root to Ethereum, but only up to an earlier L2 block; the one holding this withdrawal hasn't been synced yet. Nothing to do until then.");
+  else if (f.proof && !f.proof.rootConfirmed) notes.push("The signal proof did not fold to the synced state root yet; this tool will not act on it. Check again later.");
+  if (f.proofLookup === "failed") notes.push("We couldn't reach the endpoints to check whether this is ready to claim yet. The withdrawal is safe; try again in a minute.");
+  return {
+    state: "WAITING_FOR_FINALIZATION", eta: null, who: null, action: null, notes,
+    summary: "Waiting for Taiko to prove the batch with this withdrawal and sync its L2 state root to Ethereum. Taiko proves each batch valid rather than waiting out a challenge period, so there is no fixed wait. After that anyone can claim it; nothing claims it automatically.",
   };
 }

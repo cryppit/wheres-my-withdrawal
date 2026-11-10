@@ -135,6 +135,7 @@ export function plainNext(r) {
           `Send the claim on Ethereum. The ${chain.name} bridge app usually lists it under pending withdrawals; someone you trust can also send it from their own wallet. ${onlyTo}`,
           ...(stack === "linea" ? ["The Linea bridge app may stop listing very old withdrawals; the claim still works if it is sent another way."] : []),
           ...(stack === "polygonzkevm" ? ["On Polygon zkEVM, open the bridge at https://portal.polygon.technology/bridge with any wallet and claim the pending withdrawal, or send the claimAsset call from a developer tool. The money goes only to the recipient either way."] : []),
+          ...(stack === "taiko" ? ["On Taiko, open the bridge at https://bridge.taiko.xyz with any wallet and claim the pending withdrawal, or send the processMessage call from a developer tool. The proof is built from public chain data, so no bridge service is needed; the money goes only to the recipient either way."] : []),
           SCAM,
         ],
       };

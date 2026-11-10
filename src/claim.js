@@ -4,6 +4,7 @@
 import { selector } from "./abi.js";
 import { check, clientsFor } from "./check.js";
 import { rehearse } from "./prove.js";
+import { encodeMessageTuple } from "./taiko.js";
 
 const strip = (h) => h.replace(/^0x/, "");
 const pad = (h) => strip(h).toLowerCase().padStart(64, "0");
@@ -61,12 +62,51 @@ export function encodeScrollClaim(proof, w) {
   );
 }
 
+/** abi.encode(bytes[]) — a length word, one offset word per item, then each item's length word and padded payload. */
+function encodeBytesArray(items) {
+  const n = items.length;
+  let offset = n * 32;
+  const heads = [];
+  const tails = [];
+  for (const it of items) {
+    heads.push(uint(offset));
+    const tail = bytesTail(it);
+    tails.push(tail);
+    offset += tail.length / 2;
+  }
+  return uint(n) + heads.join("") + tails.join("");
+}
+
+/** abi.encode(ISignalService.HopProof) — 6 static head words (the two bytes[] as offsets), then the two proofs. */
+export function encodeHopProof(hop) {
+  const acc = encodeBytesArray(hop.accountProof);
+  const stor = encodeBytesArray(hop.storageProof);
+  const offAcc = 6 * 32;
+  const offStor = offAcc + acc.length / 2;
+  return uint(hop.chainId) + uint(hop.blockId) + pad(hop.rootHash) + uint(hop.cacheOption) + uint(offAcc) + uint(offStor) + acc + stor;
+}
+
+/**
+ * Bridge.processMessage(Message message, bytes proof) on the L1 Bridge — selector 0x2035065e. `proof` is
+ * abi.encode(HopProof[1]); the message and the proof bytes are both dynamic, so the two head words point to each.
+ * Verified byte-for-byte against a real processMessage transaction on 10 Nov 2026 (see test/taiko.test.js).
+ */
+export function encodeTaikoClaim(message, hop) {
+  const hopArray = uint(0x20) + uint(1) + uint(0x20) + encodeHopProof(hop); // abi.encode(HopProof[])
+  const msgEnc = encodeMessageTuple(message);
+  const head = 2 * 32;
+  return (
+    selector("processMessage((uint64,uint64,uint32,address,uint64,address,uint64,address,address,uint256,bytes),bytes)") +
+    uint(head) + uint(head + msgEnc.length / 2) + msgEnc + bytesTail("0x" + hopArray)
+  );
+}
+
 /**
  * The claim call for a withdrawal that is ready to claim, rehearsed from `from` (any account works). Returns an
  * error object when the check says it is not ready, or when the proof the endpoints gave did not check out.
  */
 export async function buildClaim(chain, txHash, { index = 0, from = "0x000000000000000000000000000000000000dEaD", clients = (c) => clientsFor(c), doFetch } = {}) {
-  if (!["arbitrum", "linea", "scroll", "polygonzkevm"].includes(chain.stack)) return { error: "bad-chain", message: "The claim builder works on Arbitrum One, Robinhood Chain, Linea, Scroll and Polygon zkEVM." };
+  if (!["arbitrum", "linea", "scroll", "polygonzkevm", "taiko"].includes(chain.stack)) return { error: "bad-chain", message: "The claim builder works on Arbitrum One, Robinhood Chain, Linea, Scroll, Polygon zkEVM and Taiko." };
   const r = await check(txHash, { chain: chain.id, index, clients });
   if (r.error) return r;
   const { facts: f, verdict: v } = r;
@@ -85,6 +125,10 @@ export async function buildClaim(chain, txHash, { index = 0, from = "0x000000000
     if (!f.proof?.rootConfirmed) return { error: "bad-proof", message: "Polygon's proof did not fold to a rollup exit root recorded on Ethereum for this withdrawal." };
     to = f.contracts.bridge;
     data = encodePolygonClaim(f.proof, f.withdrawal);
+  } else if (chain.stack === "taiko") {
+    if (!f.proof?.rootConfirmed) return { error: "bad-proof", message: "Taiko's signal proof did not fold to the L2 state root TaikoInbox synced to Ethereum for this withdrawal." };
+    to = f.contracts.l1Bridge;
+    data = encodeTaikoClaim(f.withdrawal.message, { chainId: 1, blockId: f.proof.blockId, rootHash: f.proof.rootHash, cacheOption: 0, accountProof: f.proof.accountProof, storageProof: f.proof.storageProof });
   } else if (f.withdrawal.legacy) {
     to = f.contracts.rollup;
     data = encodeLineaLegacyClaim(f.withdrawal);

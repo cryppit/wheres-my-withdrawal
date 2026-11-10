@@ -8,6 +8,7 @@ import { readFacts as readLinea } from "./linea.js";
 import { readFacts as readMorph } from "./morph.js";
 import { readFacts as readScroll } from "./scroll.js";
 import { readFacts as readPolygonZkevm } from "./polygonzkevm.js";
+import { readFacts as readTaiko } from "./taiko.js";
 import { readFacts as readZksync, claimOf as claimOfZksync } from "./zksync.js";
 import { verdict } from "./verdict.js";
 
@@ -18,7 +19,7 @@ export function clientsFor(chain, opts = {}) {
   return clients;
 }
 
-const READERS = { op: readOpStack, blast: readBlast, arbitrum: readArbitrum, linea: readLinea, morph: readMorph, scroll: readScroll, polygonzkevm: readPolygonZkevm, zksync: readZksync };
+const READERS = { op: readOpStack, blast: readBlast, arbitrum: readArbitrum, linea: readLinea, morph: readMorph, scroll: readScroll, polygonzkevm: readPolygonZkevm, taiko: readTaiko, zksync: readZksync };
 // The slow "who sent the last step" searches, run after the verdict when the page asks for deferExtras.
 const CLAIMERS = { arbitrum: claimOfArbitrum, zksync: claimOfZksync };
 

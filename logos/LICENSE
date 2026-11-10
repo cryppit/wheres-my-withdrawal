@@ -7,6 +7,7 @@ scroll.svg: dist/svgs/networks/branded/scroll.svg from @web3icons/core 4.0.58 (p
 is taken from it unmodified).
 polygonzkevm.svg: src/svgs/networks/branded/polygon-zkevm.svg from the web3icons repo (0xa3k5/web3icons, MIT),
 unmodified; renamed to match the chain id.
+taiko.svg: raw-svgs/networks/branded/taiko.svg from the web3icons repo (0xa3k5/web3icons, MIT), unmodified.
 https://github.com/0xa3k5/web3icons
 
 MIT License

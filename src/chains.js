@@ -289,6 +289,36 @@ export const CHAINS = {
     bridgeUrl: "https://portal.polygon.technology/bridge",
     explorer: "https://zkevm.polygonscan.com/tx/",
   },
+  // Taiko Alethia is a BASED validity rollup on a SignalService + Bridge — its own family, NOT OP Stack, NOT Scroll,
+  // NOT the LxLy bridge. Every address was verified on chain on 10 Nov 2026: the L1 Bridge.signalService() names the
+  // L1 SignalService below; TaikoL1 (the inbox).signalService() names the SAME SignalService (it is the contract the
+  // inbox syncs proven L2 state roots to); on L2 the Bridge.signalService() names the L2 SignalService predeploy
+  // (0x1670…0005) and the anchor's l1ChainId() is 1. Sources: docs.taiko.xyz "Contract addresses" + taikoscan, each
+  // cross-checked against the getters above — no blog trusted. A withdrawal is a MessageSent log from the L2 Bridge
+  // with destChainId == 1; its msgHash is stored as a signal in the L2 SignalService. TaikoInbox finalizes each L2
+  // batch with a validity proof and syncs its state root to the L1 SignalService as a checkpoint (getCheckpoint(uint48)
+  // -> blockNumber, blockHash, stateRoot), with NO challenge delay. The claim is processMessage(Message, bytes proof)
+  // on the L1 Bridge (selector 0x2035065e, confirmed byte-for-byte against a real processMessage tx); done means
+  // messageStatus(msgHash) == DONE (2). The signal proof is a plain eth_getProof of an L2 storage slot, which the
+  // reader re-folds to the checkpoint's synced state root before trusting it, so WMW builds the FULL claim keyless.
+  taiko: {
+    id: "taiko",
+    name: "Taiko Alethia",
+    stack: "taiko",
+    l2ChainId: 167000,
+    // rpc.mainnet.taiko.xyz serves receipts, the predeploys, wide eth_getLogs ranges and eth_getProof deep into
+    // history (head-500,000 blocks answered on 10 Nov 2026), with CORS.
+    l2Rpcs: ["https://rpc.mainnet.taiko.xyz"],
+    l1Rpcs: L1_RPCS,
+    l1ArchiveRpcs: L1_ARCHIVE_RPCS, // who sent the claim: a MessageStatusChanged log search over old L1 history
+    l1Bridge: "0xd60247c6848b7ca29eddf63aa924e53db6ddd8ec", // Bridge on Ethereum (processMessage, messageStatus)
+    l1SignalService: "0x9e0a24964e5397b566c1ed39258e21ab5e35c77c", // SignalService on Ethereum (synced checkpoints)
+    taikoInbox: "0x06a9ab27c7e2255df1815e6cc0168d7755feb19a", // TaikoL1 / TaikoInbox (proves batches, syncs state roots)
+    l2Bridge: "0x1670000000000000000000000000000000000001", // Bridge predeploy on Taiko (emits MessageSent)
+    l2SignalService: "0x1670000000000000000000000000000000000005", // SignalService predeploy on Taiko (holds the signal)
+    bridgeUrl: "https://bridge.taiko.xyz",
+    explorer: "https://taikoscan.io/tx/",
+  },
   zksync: {
     id: "zksync",
     name: "ZKsync Era",
